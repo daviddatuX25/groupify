@@ -87,6 +87,7 @@ class JoinController
             $claimed = Participant::query()
                 ->where('group_session_id', $session->id)
                 ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                ->whereNotNull('token')
                 ->exists();
 
             if ($claimed) {
@@ -97,14 +98,33 @@ class JoinController
         // AD-7: one seat per (session, device token) — same token rejoins its seat.
         $anonymous = $session->config->rules()['anonymous_mode'] ?? false;
 
-        $participant = Participant::query()->firstOrCreate(
-            ['group_session_id' => $session->id, 'token' => $data['device_token']],
-            [
-                'name' => $name,
-                'display_name' => $anonymous ? RandomName::generate() : null,
-                'email' => $data['email'] ?? null,
-            ],
-        );
+        // Proxy claim (CAP-11): joining with an existing seat's name claims it
+        // when the seat is unclaimed; a claimed seat rejects other devices.
+        $seat = Participant::query()
+            ->where('group_session_id', $session->id)
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->first();
+
+        if ($seat !== null && $seat->token !== $data['device_token']) {
+            if ($seat->token !== null) {
+                throw ValidationException::withMessages(['name' => 'That name is already taken.']);
+            }
+
+            $seat->update(['token' => $data['device_token']]);
+            $participant = $seat;
+            $recorder->record($session, 'participant_joined', ['name' => $participant->name]);
+        } elseif ($seat !== null) {
+            $participant = $seat;
+        } else {
+            $participant = Participant::query()->firstOrCreate(
+                ['group_session_id' => $session->id, 'token' => $data['device_token']],
+                [
+                    'name' => $name,
+                    'display_name' => $anonymous ? RandomName::generate() : null,
+                    'email' => $data['email'] ?? null,
+                ],
+            );
+        }
 
         if ($participant->wasRecentlyCreated) {
             $recorder->record($session, 'participant_joined', ['name' => $participant->name]);

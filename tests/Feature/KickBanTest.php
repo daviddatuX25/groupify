@@ -62,8 +62,8 @@ it('unbans a participant who can then rejoin', function () {
 
     $this->postJson(route('join.store', $this->session), [
         'pin' => $this->session->pin,
-        'name' => 'Leo',
-        'device_token' => (string) Str::uuid(),
+        'name' => $this->member->name,
+        'device_token' => $this->member->token,
     ])->assertRedirect();
 });
 

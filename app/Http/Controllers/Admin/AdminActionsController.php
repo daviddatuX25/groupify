@@ -127,6 +127,55 @@ class AdminActionsController
         return response()->json(['ok' => true, 'banned' => $banned]);
     }
 
+    /** Proxy mode (CAP-11): bulk-create unclaimed named seats (field trips). */
+    public function createParticipants(Request $request, Session $session, EventRecorder $recorder): JsonResponse
+    {
+        $this->authorizeAdmin($session, $request);
+
+        $raw = $request->validate([
+            'names' => ['required', 'array', 'max:200'],
+            'names.*' => ['string', 'max:80'],
+        ])['names'];
+
+        $names = [];
+        $seen = [];
+        foreach ($raw as $n) {
+            $n = trim((string) $n);
+            $key = mb_strtolower($n);
+            if ($n === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $names[] = $n;
+        }
+
+        $taken = Participant::query()
+            ->where('group_session_id', $session->id)
+            ->get()
+            ->map(fn ($p) => mb_strtolower($p->name))
+            ->all();
+
+        $created = 0;
+        foreach ($names as $name) {
+            $key = mb_strtolower($name);
+            if (in_array($key, $taken, true)) {
+                continue;
+            }
+
+            Participant::query()->create([
+                'group_session_id' => $session->id,
+                'name' => $name,
+                'token' => null,
+            ]);
+            $taken[] = $key;
+            $created++;
+        }
+
+        $recorder->record($session, 'proxied_seats_created', ['count' => $created]);
+
+        return response()->json(['ok' => true, 'created' => $created]);
+    }
+
     /** Assign or clear a session custom role (CAP-7). */
     public function assignRole(Request $request, Session $session, Participant $participant): JsonResponse
     {

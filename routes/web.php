@@ -55,6 +55,8 @@ Route::patch('/admin/sessions/{session}/state', [SessionStateController::class, 
     ->name('admin.sessions.state.update');
 Route::delete('/admin/sessions/{session}', [SessionStateController::class, 'destroy'])
     ->name('admin.sessions.destroy');
+Route::post('/admin/sessions/{session}/participants', [AdminActionsController::class, 'createParticipants'])
+    ->name('admin.participants.store');
 Route::post('/admin/sessions/{session}/members/{participant}/ban', [AdminActionsController::class, 'ban'])
     ->name('admin.members.ban');
 Route::post('/admin/sessions/{session}/members/{participant}/role', [AdminActionsController::class, 'assignRole'])

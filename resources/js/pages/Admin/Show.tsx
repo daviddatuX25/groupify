@@ -39,6 +39,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [templateName, setTemplateName] = useState('');
     const [announceDraft, setAnnounceDraft] = useState('');
     const [roleName, setRoleName] = useState('');
+    const [proxyNames, setProxyNames] = useState('');
     const [roleActions, setRoleActions] = useState('');
     const [modQueue, setModQueue] = useState<{ id: number; scope: string; author: string; body: string }[]>([]);
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
@@ -513,6 +514,34 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                         </div>
                     </div>
                 )}
+
+                {/* Proxy mode (phase-2 L) */}
+                <div className="mt-8 rounded-2xl border border-white/10 bg-slate-900 p-4">
+                    <span className="text-sm font-bold uppercase tracking-wide text-slate-400">Proxy importer</span>
+                    <p className="mt-1 text-xs text-slate-500">
+                        Add people who are not present (field trips): one name per line. They join later and claim their seat.
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                        <textarea
+                            value={proxyNames}
+                            onChange={(e) => setProxyNames(e.target.value)}
+                            rows={4}
+                            placeholder={'Ana\nBen\nCai'}
+                            className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const names = proxyNames.split('\n').map((n) => n.trim()).filter(Boolean);
+                                if (!names.length) return;
+                                act(`/admin/sessions/${session.id}/participants`, { names });
+                            }}
+                            className="h-fit rounded-lg bg-cyan-400/15 px-4 py-2 text-sm font-semibold text-cyan-300 hover:bg-cyan-400/25"
+                        >
+                            Create seats
+                        </button>
+                    </div>
+                </div>
 
                 {/* Custom roles (phase-2 J) */}
                 <div className="mt-8 flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 p-4">
