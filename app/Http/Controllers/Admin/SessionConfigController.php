@@ -22,7 +22,7 @@ class SessionConfigController
 
         $merged = array_replace_recursive(
             $session->config->toArray(),
-            $request->only(['rules', 'fields', 'perms', 'extensions', 'roles'])
+            $request->only(['rules', 'fields', 'perms', 'extensions', 'roles', 'quiz'])
         );
 
         $validated = Validator::make($merged, self::rules())->validate();
@@ -85,6 +85,13 @@ class SessionConfigController
             'roles' => ['array'],
             'roles.*' => ['array'],
             'roles.*.*' => ['string'],
+            'quiz' => ['nullable', 'array'],
+            'quiz.questions' => ['array'],
+            'quiz.questions.*.q' => ['required', 'string', 'max:200'],
+            'quiz.questions.*.options' => ['required', 'array', 'min:2', 'max:6'],
+            'quiz.questions.*.options.*' => ['required', 'string', 'max:80'],
+            'quiz.questions.*.answer' => ['required', 'integer', 'min:0'],
+            'quiz.questions.*.points' => ['required', 'integer', 'min:1', 'max:100'],
             'extensions' => ['array'],
             'extensions.*' => ['string', 'max:60'],
         ];

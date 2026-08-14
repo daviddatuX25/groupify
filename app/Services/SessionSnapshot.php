@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Group;
 use App\Models\Membership;
 use App\Models\Participant;
+use App\Models\QuizAnswer;
+use App\Models\QuizRun;
 use App\Models\Session;
 use Illuminate\Support\Carbon;
 
@@ -38,7 +40,47 @@ class SessionSnapshot
             ->orderBy('name')
             ->get(['id', 'name', 'display_name', 'custom_role']);
 
+        $quiz = null;
+        $run = QuizRun::query()->where('group_session_id', $session->id)->latest('id')->first();
+        if ($run !== null && $session->config->quiz() !== []) {
+            $questions = $session->config->quiz();
+            $answers = QuizAnswer::query()->where('group_session_id', $session->id)->get();
+
+            $quiz = [
+                'status' => $run->status,
+                'current_index' => $run->current_index,
+                'total' => count($questions),
+                'question' => $questions[$run->current_index] ?? null,
+                'my_answer' => $me === null ? null : (function () use ($me, $answers, $run) {
+                    $gid = Membership::query()
+                        ->where('participant_id', $me->id)
+                        ->where('status', 'active')
+                        ->value('group_id');
+
+                    return $gid === null ? null : $answers
+                        ->where('group_id', $gid)
+                        ->where('question_index', $run->current_index)
+                        ->value('answer_index');
+                })(),
+                'leaderboard' => $session->groups()
+                    ->withCount('memberships')
+                    ->get()
+                    ->map(function (Group $group) use ($answers) {
+                        return [
+                            'group_id' => $group->id,
+                            'name' => $group->name,
+                            'points' => (int) $answers->where('group_id', $group->id)->sum('points'),
+                            'answered' => (int) $answers->where('group_id', $group->id)->count(),
+                        ];
+                    })
+                    ->sortByDesc('points')
+                    ->values()
+                    ->all(),
+            ];
+        }
+
         return [
+            'quiz' => $quiz,
             'code' => $session->code,
             'status' => $session->status,
             'dissolve_at' => $session->dissolve_at !== null ? Carbon::parse($session->dissolve_at)->toIso8601String() : null,

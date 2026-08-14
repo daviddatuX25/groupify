@@ -17,6 +17,7 @@ final class RoleDefaults
         'fill_group_fields' => ['admin' => true, 'leader' => true, 'member' => true],
         'announce' => ['admin' => true, 'leader' => false, 'member' => false],
         'kick_ban' => ['admin' => true, 'leader' => true, 'member' => false],
+        'answer_quiz' => ['admin' => false, 'leader' => true, 'member' => false],
         'export_csv' => ['admin' => true, 'leader' => false, 'member' => false],
     ];
 

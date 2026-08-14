@@ -94,6 +94,15 @@ class SessionConfig implements Arrayable, JsonSerializable
         return $this->data['roles'] ?? [];
     }
 
+    /** Quiz questions defined by the admin (CAP-8).
+     *
+     * @return array<int, array{q: string, options: array<int, string>, answer: int, points: int}>
+     */
+    public function quiz(): array
+    {
+        return $this->data['quiz']['questions'] ?? [];
+    }
+
     /** @return array<int, string> */
     public function guestList(): array
     {

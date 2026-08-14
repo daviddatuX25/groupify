@@ -13,6 +13,7 @@ use App\Http\Controllers\GroupController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\QuizController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SessionPageController;
 use Illuminate\Support\Facades\Route;
@@ -55,6 +56,12 @@ Route::patch('/admin/sessions/{session}/state', [SessionStateController::class, 
     ->name('admin.sessions.state.update');
 Route::delete('/admin/sessions/{session}', [SessionStateController::class, 'destroy'])
     ->name('admin.sessions.destroy');
+Route::put('/admin/sessions/{session}/quiz', [QuizController::class, 'save'])
+    ->name('admin.quiz.save');
+Route::post('/admin/sessions/{session}/quiz/start', [QuizController::class, 'start'])
+    ->name('admin.quiz.start');
+Route::post('/s/{session:code}/groups/{group}/quiz/answer', [QuizController::class, 'answer'])
+    ->name('quiz.answer');
 Route::post('/admin/sessions/{session}/participants', [AdminActionsController::class, 'createParticipants'])
     ->name('admin.participants.store');
 Route::post('/admin/sessions/{session}/members/{participant}/ban', [AdminActionsController::class, 'ban'])

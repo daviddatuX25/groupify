@@ -40,6 +40,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [announceDraft, setAnnounceDraft] = useState('');
     const [roleName, setRoleName] = useState('');
     const [proxyNames, setProxyNames] = useState('');
+    const [quizDraft, setQuizDraft] = useState([{ q: '', options: ['', '', '', ''], answer: 0, points: 10 }]);
     const [roleActions, setRoleActions] = useState('');
     const [modQueue, setModQueue] = useState<{ id: number; scope: string; author: string; body: string }[]>([]);
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
@@ -514,6 +515,132 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                         </div>
                     </div>
                 )}
+
+                {/* Quiz extension (phase-2 M) */}
+                <div className="mt-8 rounded-2xl border border-white/10 bg-slate-900 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <span className="text-sm font-bold uppercase tracking-wide text-slate-400">Quiz</span>
+                            {data.quiz && (
+                                <p className="mt-1 text-xs text-slate-500">
+                                    {data.quiz.status === 'live' && `Live · Q${data.quiz.current_index + 1}/${data.quiz.total}`}
+                                    {data.quiz.status === 'done' && 'Finished'}
+                                    {data.quiz.status === 'live' && ' · leaderboard:'}
+                                    {data.quiz && data.quiz.leaderboard?.slice(0, 3).map((l: { name: string; points: number }) => (
+                                        <span key={l.name} className="ml-1">
+                                            {l.name} {l.points}
+                                        </span>
+                                    ))}
+                                </p>
+                            )}
+                        </div>
+                        {data.quiz?.status === 'live' && (
+                            <button
+                                type="button"
+                                onClick={() => act(`/admin/sessions/${session.id}/quiz/start`)}
+                                className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+                                disabled
+                            >
+                                running…
+                            </button>
+                        )}
+                        {(!data.quiz || data.quiz.status === 'done') && (
+                            <button
+                                type="button"
+                                onClick={() => act(`/admin/sessions/${session.id}/quiz/start`)}
+                                className="rounded-lg bg-cyan-400/15 px-3 py-1.5 text-sm font-semibold text-cyan-300 hover:bg-cyan-400/25"
+                            >
+                                Start quiz
+                            </button>
+                        )}
+                    </div>
+                    {(!data.quiz || data.quiz.status === 'done') && (
+                        <div className="mt-3 space-y-2">
+                            {quizDraft.map((qq, qi) => (
+                                <div key={qi} className="rounded-lg border border-white/10 bg-slate-950 p-3">
+                                    <div className="flex gap-2">
+                                        <input
+                                            value={qq.q}
+                                            onChange={(e) =>
+                                                setQuizDraft((d) => d.map((x, i) => (i === qi ? { ...x, q: e.target.value } : x)))
+                                            }
+                                            placeholder={`Question ${qi + 1}`}
+                                            className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-1 text-sm outline-none focus:border-cyan-400"
+                                        />
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={100}
+                                            value={qq.points}
+                                            onChange={(e) =>
+                                                setQuizDraft((d) => d.map((x, i) => (i === qi ? { ...x, points: Number(e.target.value) } : x)))
+                                            }
+                                            className="w-16 rounded-lg border border-white/10 bg-slate-900 px-2 py-1 text-sm outline-none focus:border-cyan-400"
+                                            title="points"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setQuizDraft((d) => d.filter((_, i) => i !== qi))}
+                                            className="rounded bg-rose-400/15 px-2 text-xs text-rose-300"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                    {qq.options.map((opt, oi) => (
+                                        <div key={oi} className="mt-1 flex items-center gap-2">
+                                            <input
+                                                type="radio"
+                                                name={`correct-${qi}`}
+                                                checked={qq.answer === oi}
+                                                onChange={() => setQuizDraft((d) => d.map((x, i) => (i === qi ? { ...x, answer: oi } : x)))}
+                                                className="accent-emerald-400"
+                                            />
+                                            <input
+                                                value={opt}
+                                                onChange={(e) =>
+                                                    setQuizDraft((d) =>
+                                                        d.map((x, i) =>
+                                                            i === qi ? { ...x, options: x.options.map((o, j) => (j === oi ? e.target.value : o)) } : x,
+                                                        ),
+                                                    )
+                                                }
+                                                placeholder={`Option ${oi + 1}`}
+                                                className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-1 text-sm outline-none focus:border-cyan-400"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setQuizDraft((d) => [...d, { q: '', options: ['', '', '', ''], answer: 0, points: 10 }])}
+                                    className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+                                >
+                                    + question
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        act(`/admin/sessions/${session.id}/quiz`, {
+                                            questions: quizDraft
+                                                .filter((qq) => qq.q.trim())
+                                                .map((qq) => ({
+                                                    q: qq.q.trim(),
+                                                    options: qq.options.map((o) => o.trim()).filter(Boolean),
+                                                    answer: qq.answer,
+                                                    points: qq.points,
+                                                })),
+                                        })
+                                    }
+                                    className="rounded-lg bg-cyan-400/15 px-4 py-1.5 text-sm font-semibold text-cyan-300 hover:bg-cyan-400/25"
+                                >
+                                    Save quiz
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {/* Proxy mode (phase-2 L) */}
                 <div className="mt-8 rounded-2xl border border-white/10 bg-slate-900 p-4">

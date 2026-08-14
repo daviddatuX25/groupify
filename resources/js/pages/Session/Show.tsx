@@ -188,6 +188,70 @@ export default function Show({ session }: { session: SessionProps }) {
             </div>
             <ServerStatus />
 
+            {/* Quiz extension (phase-2 M) */}
+            {data.quiz && data.quiz.status === 'live' && (
+                <div className="mb-6 rounded-2xl border border-cyan-400/20 bg-slate-900 p-5">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-cyan-300">
+                            Quiz · Q{data.quiz.current_index + 1}/{data.quiz.total}
+                        </h3>
+                        {data.me && data.me.id === (data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.leader_id ?? -1) ? (
+                            data.quiz.my_answer !== null && data.quiz.my_answer !== undefined ? (
+                                <span className="text-sm text-emerald-400">Answered ✓</span>
+                            ) : (
+                                <span className="text-sm text-slate-400">Leader answers for the group</span>
+                            )
+                        ) : (
+                            <span className="text-sm text-slate-400">
+                                {data.quiz.my_answer !== null && data.quiz.my_answer !== undefined ? 'Answered ✓' : 'waiting for your leader…'}
+                            </span>
+                        )}
+                    </div>
+                    <p className="mt-3 text-lg font-semibold text-slate-100">{data.quiz.question?.q}</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {data.quiz.question?.options.map((opt: string, oi: number) => {
+                            const answered = data.quiz.my_answer !== null && data.quiz.my_answer !== undefined;
+                            const isLeader =
+                                data.me && data.me.id === (data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.leader_id ?? -1);
+                            return (
+                                <button
+                                    key={oi}
+                                    type="button"
+                                    disabled={!isLeader || answered}
+                                    onClick={() => {
+                                        setQuizPick(oi);
+                                        const gid = data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.id;
+                                        if (gid) mutate(`/s/${data.code}/groups/${gid}/quiz/answer`, { question_index: data.quiz.current_index, answer_index: oi });
+                                    }}
+                                    className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
+                                        answered && quizPick === oi
+                                            ? 'border-emerald-400 bg-emerald-400/10 text-emerald-300'
+                                            : answered
+                                              ? 'border-white/10 bg-slate-950 text-slate-500'
+                                              : 'border-white/10 bg-slate-950 text-slate-200 hover:border-cyan-400/50'
+                                    }`}
+                                >
+                                    {String.fromCharCode(65 + oi)}. {opt}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div className="mt-4 border-t border-white/10 pt-3">
+                        <span className="text-xs uppercase tracking-wide text-slate-500">Leaderboard</span>
+                        <ol className="mt-1 space-y-1 text-sm">
+                            {data.quiz.leaderboard?.map((l: { name: string; points: number }, i: number) => (
+                                <li key={l.name} className="flex items-center justify-between text-slate-300">
+                                    <span>
+                                        {i + 1}. {l.name}
+                                    </span>
+                                    <span className="text-cyan-300">{l.points} pts</span>
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                </div>
+            )}
+
             <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
                 <header className="flex items-center justify-between">
                     <div>
