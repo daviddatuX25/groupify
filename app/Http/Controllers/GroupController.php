@@ -185,6 +185,30 @@ class GroupController
         return response()->json(['ok' => true, 'group_id' => $group->id]);
     }
 
+    /** Group leader kicks a member back to the pool (CAP-10). */
+    public function kick(Request $request, Session $session, Group $group, Participant $participant, EventRecorder $recorder): JsonResponse
+    {
+        $me = $this->participant($request, $session);
+        $this->assertMutable($session);
+        $this->assertGroupInSession($group, $session);
+
+        $perms = app(PermissionService::class);
+        if ($group->leader_id !== $me->id || ! $perms->can('kick_ban', 'leader', $session->config)) {
+            abort(404);
+        }
+
+        Membership::query()
+            ->where('group_id', $group->id)
+            ->where('participant_id', $participant->id)
+            ->where('status', 'active')
+            ->delete();
+
+        broadcast(new MembershipChanged($session, $group->id, 'left'))->toOthers();
+        $recorder->record($session, 'member_kicked', ['group_id' => $group->id, 'name' => $participant->name]);
+
+        return response()->json(['ok' => true]);
+    }
+
     /** Leader approves a pending join request (FR-4.2, CAP-4). */
     public function approve(Request $request, Session $session, Group $group, Participant $participant, EventRecorder $recorder): JsonResponse
     {

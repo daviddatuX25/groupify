@@ -385,6 +385,15 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                         >
                             <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#4edea3]" />
                             {p.name}
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    act(`/admin/sessions/${session.id}/members/${p.id}/ban`, { banned: true })
+                                }
+                                className="rounded bg-rose-400/15 px-1.5 py-0.5 text-[10px] text-rose-300"
+                            >
+                                ban
+                            </button>
                             <select
                                 className="rounded bg-slate-950 px-1 py-0.5 text-xs text-slate-400 outline-none"
                                 value={p.custom_role ?? ''}

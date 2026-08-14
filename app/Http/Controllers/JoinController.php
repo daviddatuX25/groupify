@@ -61,6 +61,22 @@ class JoinController
         }
 
         $name = trim($data['name']);
+
+        $bannedByName = Participant::query()
+            ->where('group_session_id', $session->id)
+            ->whereNotNull('banned_at')
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->exists();
+
+        $bannedByToken = Participant::query()
+            ->where('group_session_id', $session->id)
+            ->where('token', $data['device_token'])
+            ->whereNotNull('banned_at')
+            ->exists();
+
+        if ($bannedByName || $bannedByToken) {
+            throw ValidationException::withMessages(['name' => 'This name is banned from the session.']);
+        }
         $guestList = $session->config->guestList();
         if ($guestList !== []) {
             $allowed = array_map(fn ($n) => mb_strtolower(trim((string) $n)), $guestList);

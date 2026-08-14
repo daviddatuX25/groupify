@@ -106,6 +106,27 @@ class AdminActionsController
         return response()->json(['ok' => true, 'affected' => $affected]);
     }
 
+    /** Ban or unban a participant (CAP-10): banned = kicked from all groups, joins blocked. */
+    public function ban(Request $request, Session $session, Participant $participant, EventRecorder $recorder): JsonResponse
+    {
+        $this->authorizeAdmin($session, $request);
+
+        abort_unless($participant->group_session_id === $session->id, 404);
+
+        $banned = $request->validate(['banned' => ['required', 'boolean']])['banned'];
+
+        $participant->update(['banned_at' => $banned ? now() : null]);
+
+        if ($banned) {
+            Membership::query()->where('participant_id', $participant->id)->delete();
+            broadcast(new MembershipChanged($session, 0, 'left'))->toOthers();
+        }
+
+        $recorder->record($session, $banned ? 'participant_banned' : 'participant_unbanned', ['name' => $participant->name]);
+
+        return response()->json(['ok' => true, 'banned' => $banned]);
+    }
+
     /** Assign or clear a session custom role (CAP-7). */
     public function assignRole(Request $request, Session $session, Participant $participant): JsonResponse
     {

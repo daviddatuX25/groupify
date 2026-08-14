@@ -401,6 +401,20 @@ export default function Show({ session }: { session: SessionProps }) {
                                             {m.role === 'leader' && (
                                                 <span className="text-xs text-emerald-400">lead</span>
                                             )}
+                                            {canMutate &&
+                                                data.me?.id === g.leader_id &&
+                                                m.role !== 'leader' &&
+                                                m.id !== data.me.id && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            mutate(`/s/${data.code}/groups/${g.id}/members/${m.id}/kick`)
+                                                        }
+                                                        className="ml-auto rounded bg-rose-400/15 px-1.5 py-0.5 text-[10px] text-rose-300"
+                                                    >
+                                                        kick
+                                                    </button>
+                                                )}
                                         </li>
                                     ))}
                                 </ul>

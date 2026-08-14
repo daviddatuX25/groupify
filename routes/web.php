@@ -41,6 +41,8 @@ Route::post('/s/{session:code}/messages', [MessageController::class, 'store'])->
 Route::post('/s/{session:code}/match-me', [GroupController::class, 'matchMe'])->name('match-me');
 Route::post('/s/{session:code}/groups', [GroupController::class, 'store'])->name('groups.store');
 Route::post('/s/{session:code}/groups/{group}/join', [GroupController::class, 'join'])->name('groups.join');
+Route::post('/s/{session:code}/groups/{group}/members/{participant}/kick', [GroupController::class, 'kick'])
+    ->name('groups.kick');
 Route::post('/s/{session:code}/groups/{group}/leave', [GroupController::class, 'leave'])->name('groups.leave');
 Route::post('/s/{session:code}/groups/{group}/requests/{participant}/approve', [GroupController::class, 'approve'])->name('groups.approve');
 Route::post('/s/{session:code}/groups/{group}/requests/{participant}/reject', [GroupController::class, 'reject'])->name('groups.reject');
@@ -53,6 +55,8 @@ Route::patch('/admin/sessions/{session}/state', [SessionStateController::class, 
     ->name('admin.sessions.state.update');
 Route::delete('/admin/sessions/{session}', [SessionStateController::class, 'destroy'])
     ->name('admin.sessions.destroy');
+Route::post('/admin/sessions/{session}/members/{participant}/ban', [AdminActionsController::class, 'ban'])
+    ->name('admin.members.ban');
 Route::post('/admin/sessions/{session}/members/{participant}/role', [AdminActionsController::class, 'assignRole'])
     ->name('admin.members.role');
 Route::post('/admin/sessions/{session}/members/{participant}/move', [AdminActionsController::class, 'move'])
