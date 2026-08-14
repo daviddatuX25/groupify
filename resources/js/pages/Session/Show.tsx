@@ -199,13 +199,22 @@ export default function Show({ session }: { session: SessionProps }) {
                         )}
                         {canMutate &&
                             data.me.pooled && (
-                                <button
-                                    type="button"
-                                    onClick={() => setCreating((c) => !c)}
-                                    className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-bold text-emerald-950 transition active:scale-[0.97]"
-                                >
-                                    + Create New Group
-                                </button>
+                                <span className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => mutate(`/s/${data.code}/match-me`)}
+                                        className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-bold text-deep-ink transition active:scale-[0.97]"
+                                    >
+                                        ⚡ Match me
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCreating((c) => !c)}
+                                        className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-bold text-emerald-950 transition active:scale-[0.97]"
+                                    >
+                                        + Create New Group
+                                    </button>
+                                </span>
                             )}
                         {canMutate && meIn && (
                             <button

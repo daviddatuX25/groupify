@@ -33,6 +33,7 @@ Route::get('/s/{session:code}', [SessionPageController::class, 'show'])->name('s
 Route::get('/api/sessions/{session:code}/board', [BoardController::class, 'show'])->name('board.show');
 
 // Participant group mutations (FR-4.1 … FR-4.3): device-token identity, transactional checks (AD-7)
+Route::post('/s/{session:code}/match-me', [GroupController::class, 'matchMe'])->name('match-me');
 Route::post('/s/{session:code}/groups', [GroupController::class, 'store'])->name('groups.store');
 Route::post('/s/{session:code}/groups/{group}/join', [GroupController::class, 'join'])->name('groups.join');
 Route::post('/s/{session:code}/groups/{group}/leave', [GroupController::class, 'leave'])->name('groups.leave');
@@ -49,6 +50,8 @@ Route::delete('/admin/sessions/{session}', [SessionStateController::class, 'dest
     ->name('admin.sessions.destroy');
 Route::post('/admin/sessions/{session}/members/{participant}/move', [AdminActionsController::class, 'move'])
     ->name('admin.members.move');
+Route::post('/admin/sessions/{session}/auto-distribute', [AdminActionsController::class, 'distribute'])
+    ->name('admin.auto-distribute');
 Route::post('/admin/sessions/{session}/dissolve', [AdminActionsController::class, 'dissolve'])
     ->name('admin.dissolve');
 Route::get('/admin/sessions/{session}/export', [AdminExportController::class, 'csv'])

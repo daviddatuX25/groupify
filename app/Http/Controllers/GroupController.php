@@ -151,6 +151,40 @@ class GroupController
         return response()->json(['ok' => true]);
     }
 
+    /** Match me: auto-assign the pooled participant to the least-full group (CAP-12). */
+    public function matchMe(Request $request, Session $session, EventRecorder $recorder): JsonResponse
+    {
+        $me = $this->participant($request, $session);
+        $this->assertMutable($session);
+        $this->assertPooled($me);
+
+        $group = DB::transaction(function () use ($session, $me) {
+            $group = Group::query()
+                ->where('group_session_id', $session->id)
+                ->get()
+                ->filter(fn (Group $g) => $g->openSlots($session) > 0)
+                ->sortByDesc(fn (Group $g) => $g->openSlots($session))
+                ->first();
+
+            if ($group === null) {
+                throw ValidationException::withMessages(['group' => 'No group has space right now.']);
+            }
+
+            $group->memberships()->create([
+                'participant_id' => $me->id,
+                'role' => 'member',
+                'status' => 'active',
+            ]);
+
+            return $group;
+        });
+
+        broadcast(new MembershipChanged($session, $group->id, 'joined'))->toOthers();
+        $recorder->record($session, 'member_joined', ['group_id' => $group->id, 'name' => $me->name, 'auto' => true]);
+
+        return response()->json(['ok' => true, 'group_id' => $group->id]);
+    }
+
     /** Leader approves a pending join request (FR-4.2, CAP-4). */
     public function approve(Request $request, Session $session, Group $group, Participant $participant, EventRecorder $recorder): JsonResponse
     {

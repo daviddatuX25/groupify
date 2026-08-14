@@ -287,9 +287,19 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                 </div>
 
                 {/* Pool */}
-                <h2 className="mt-8 text-sm font-bold uppercase tracking-wide text-slate-400">
-                    Unassigned pool ({data.pool.length})
-                </h2>
+                <div className="mt-8 flex items-center justify-between">
+                    <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">
+                        Unassigned pool ({data.pool.length})
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={() => act(`/admin/sessions/${session.id}/auto-distribute`)}
+                        disabled={data.pool.length === 0}
+                        className="rounded-lg bg-cyan-400 px-4 py-1.5 text-xs font-bold text-deep-ink transition hover:bg-cyan-300 disabled:opacity-40"
+                    >
+                        ⚡ Auto-Distribute
+                    </button>
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                     {data.pool.map((p) => (
                         <span

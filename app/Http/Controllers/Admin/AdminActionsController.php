@@ -106,6 +106,50 @@ class AdminActionsController
         return response()->json(['ok' => true, 'affected' => $affected]);
     }
 
+    /** Auto-distribute all pooled participants into groups with space (mockup Auto-Distribute). */
+    public function distribute(Request $request, Session $session): JsonResponse
+    {
+        $this->authorizeAdmin($session, $request);
+
+        $groups = Group::query()->where('group_session_id', $session->id)->get();
+        $pooled = Participant::query()
+            ->where('group_session_id', $session->id)
+            ->whereNotIn('id', Membership::query()->where('status', 'active')->pluck('participant_id'))
+            ->orderBy('name')
+            ->get();
+
+        $assigned = DB::transaction(function () use ($groups, $pooled, $session) {
+            $slots = $groups->mapWithKeys(fn (Group $g) => [$g->id => $g->openSlots($session)])->all();
+            $count = 0;
+
+            foreach ($pooled as $participant) {
+                arsort($slots);
+                $groupId = array_key_first($slots);
+
+                if ($groupId === null || $slots[$groupId] <= 0) {
+                    break;
+                }
+
+                Membership::query()->create([
+                    'group_id' => $groupId,
+                    'participant_id' => $participant->id,
+                    'role' => 'member',
+                    'status' => 'active',
+                ]);
+                $slots[$groupId]--;
+                $count++;
+            }
+
+            return $count;
+        });
+
+        if ($assigned > 0) {
+            broadcast(new MembershipChanged($session, 0, 'auto_distributed'))->toOthers();
+        }
+
+        return response()->json(['ok' => true, 'assigned' => $assigned]);
+    }
+
     /** Delete the member's active seat; transfer leadership if they led. */
     private function releaseSeat(Membership $membership): void
     {

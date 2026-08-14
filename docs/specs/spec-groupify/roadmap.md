@@ -29,7 +29,7 @@ Phasing preserves the full vision (locked decision: cut scope, never the vision)
 ## Phase 3+
 
 - Proxy mode + bulk importer (field-trip use case)
-- Auto-dissolve timer, match-me auto-assign
+- Auto-dissolve timer (pending); ~~match-me auto-assign~~ — **SHIPPED with Auto-Distribute (phase-2 story B, 2026-08-14)**
 - Device binding (FingerprintJS; convenience-grade)
 - Group quiz extension, custom roles
 - PWA shell
