@@ -83,7 +83,7 @@ development_status:
   # Epic 6 — Deploy & Ops
   epic-6: backlog
   6-1-docker-dev: in-progress
-  6-2-reverb-queue: ready-for-dev
+  6-2-reverb-queue: review
   6-3-dokploy-deploy: ready-for-dev
   6-4-e2e-smoke: ready-for-dev
   epic-6-retrospective: optional
