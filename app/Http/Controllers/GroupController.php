@@ -85,27 +85,28 @@ class GroupController
         $this->assertGroupInSession($group, $session);
 
         $config = $session->config;
-        if ($config->rules()['join_mode'] !== 'open') {
-            throw ValidationException::withMessages(['group' => 'This session requires approval to join.']);
-        }
+        $isApproval = $config->rules()['join_mode'] !== 'open';
 
-        $joined = DB::transaction(function () use ($group, $me, $session) {
-            $group = Group::query()->lockForUpdate()->findOrFail($group->id);
-            if ($group->openSlots($session) <= 0) {
-                throw ValidationException::withMessages(['group' => 'This group is full.']);
+        $joined = DB::transaction(function () use ($group, $me, $session, $isApproval) {
+            if (! $isApproval) {
+                $group = Group::query()->lockForUpdate()->findOrFail($group->id);
+                if ($group->openSlots($session) <= 0) {
+                    throw ValidationException::withMessages(['group' => 'This group is full.']);
+                }
             }
 
             return $group->memberships()->create([
                 'participant_id' => $me->id,
                 'role' => 'member',
-                'status' => 'active',
+                'status' => $isApproval ? 'pending' : 'active',
             ]);
         });
 
-        broadcast(new MembershipChanged($session, $group->id, 'joined'))->toOthers();
-        $recorder->record($session, 'member_joined', ['group_id' => $group->id, 'name' => $me->name]);
+        $action = $isApproval ? 'pending' : 'joined';
+        broadcast(new MembershipChanged($session, $group->id, $action))->toOthers();
+        $recorder->record($session, $isApproval ? 'join_requested' : 'member_joined', ['group_id' => $group->id, 'name' => $me->name]);
 
-        return response()->json(['ok' => true, 'membership_id' => $joined->id]);
+        return response()->json(['ok' => true, 'membership_id' => $joined->id, 'status' => $joined->status]);
     }
 
     public function leave(Request $request, Session $session, Group $group, EventRecorder $recorder): JsonResponse
@@ -146,6 +147,70 @@ class GroupController
 
         broadcast(new MembershipChanged($session, $group->id, $wasLeader ? 'leader_changed' : 'left'))->toOthers();
         $recorder->record($session, 'member_left', ['group_id' => $group->id, 'name' => $me->name]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** Leader approves a pending join request (FR-4.2, CAP-4). */
+    public function approve(Request $request, Session $session, Group $group, Participant $participant, EventRecorder $recorder): JsonResponse
+    {
+        $me = $this->participant($request, $session);
+        $this->assertMutable($session);
+        $this->assertGroupInSession($group, $session);
+
+        if ($group->leader_id !== $me->id) {
+            abort(404);
+        }
+
+        $perms = app(PermissionService::class);
+        if (! $perms->can('approve_join', 'leader', $session->config)) {
+            throw ValidationException::withMessages(['group' => 'Approvals are controlled by the facilitator.']);
+        }
+
+        $membership = Membership::query()
+            ->where('group_id', $group->id)
+            ->where('participant_id', $participant->id)
+            ->where('status', 'pending')
+            ->first();
+
+        abort_unless($membership !== null, 404);
+
+        $membership->update(['status' => 'active', 'role' => 'member']);
+
+        broadcast(new MembershipChanged($session, $group->id, 'approved'))->toOthers();
+        $recorder->record($session, 'join_approved', ['group_id' => $group->id, 'name' => $participant->name]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** Leader rejects a pending join request. */
+    public function reject(Request $request, Session $session, Group $group, Participant $participant, EventRecorder $recorder): JsonResponse
+    {
+        $me = $this->participant($request, $session);
+        $this->assertMutable($session);
+        $this->assertGroupInSession($group, $session);
+
+        if ($group->leader_id !== $me->id) {
+            abort(404);
+        }
+
+        $perms = app(PermissionService::class);
+        if (! $perms->can('approve_join', 'leader', $session->config)) {
+            throw ValidationException::withMessages(['group' => 'Approvals are controlled by the facilitator.']);
+        }
+
+        $membership = Membership::query()
+            ->where('group_id', $group->id)
+            ->where('participant_id', $participant->id)
+            ->where('status', 'pending')
+            ->first();
+
+        abort_unless($membership !== null, 404);
+
+        $membership->delete();
+
+        broadcast(new MembershipChanged($session, $group->id, 'rejected'))->toOthers();
+        $recorder->record($session, 'join_rejected', ['group_id' => $group->id, 'name' => $participant->name]);
 
         return response()->json(['ok' => true]);
     }

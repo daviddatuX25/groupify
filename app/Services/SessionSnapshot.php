@@ -59,6 +59,15 @@ class SessionSnapshot
                         'role' => $m->role,
                     ])
                     ->values(),
+                'pending' => $group->memberships()
+                    ->with('participant')
+                    ->where('status', 'pending')
+                    ->get()
+                    ->map(fn (Membership $m) => [
+                        'id' => $m->participant_id,
+                        'name' => $m->participant->name,
+                    ])
+                    ->values(),
             ])->values(),
             'me' => $me === null ? null : [
                 'id' => $me->id,

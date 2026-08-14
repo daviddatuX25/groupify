@@ -19,7 +19,7 @@ Phasing preserves the full vision (locked decision: cut scope, never the vision)
 ## Phase 2
 
 - Full permission matrix UI (all actions × roles, per-session toggles)
-- Approval queue for join requests (leader + admin approve/reject with message)
+- ~~Approval queue for join requests~~ — **SHIPPED (phase-2 story A, 2026-08-14)**; admin-side queue view still pending
 - Communication tiers: announcements (priority banner), global chat, group chat + announcements (Reverb-ready)
 - Moderation: kick & ban from group, global ban/blacklist, ghost-group GC + ownership transfer
 - Extensions shelf UI (toggle modules per session)

@@ -36,6 +36,8 @@ Route::get('/api/sessions/{session:code}/board', [BoardController::class, 'show'
 Route::post('/s/{session:code}/groups', [GroupController::class, 'store'])->name('groups.store');
 Route::post('/s/{session:code}/groups/{group}/join', [GroupController::class, 'join'])->name('groups.join');
 Route::post('/s/{session:code}/groups/{group}/leave', [GroupController::class, 'leave'])->name('groups.leave');
+Route::post('/s/{session:code}/groups/{group}/requests/{participant}/approve', [GroupController::class, 'approve'])->name('groups.approve');
+Route::post('/s/{session:code}/groups/{group}/requests/{participant}/reject', [GroupController::class, 'reject'])->name('groups.reject');
 
 // Admin-only (AD-3: token in query or X-Admin-Token header)
 Route::get('/admin/sessions/{session}', [AdminPanelController::class, 'show'])->name('admin.sessions.show');

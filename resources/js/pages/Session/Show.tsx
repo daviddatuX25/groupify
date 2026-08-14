@@ -8,6 +8,7 @@ type Group = {
     id: number;
     name: string;
     leader_id: number | null;
+    pending?: { id: number; name: string }[];
     member_count: number;
     capacity: number;
     open_slots: number;
@@ -38,6 +39,7 @@ export default function Show({ session }: { session: SessionProps }) {
     const [board, setBoard] = useState<SessionProps | null>(null);
     const [flash, setFlash] = useState<{ groupId: number; kind: 'joined' | 'left' } | null>(null);
     const [gone, setGone] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
     const prevStatus = useRef<string | null>(null);
 
     const deviceToken =
@@ -106,9 +108,19 @@ export default function Show({ session }: { session: SessionProps }) {
                 ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : {}),
             },
             body: JSON.stringify(payload),
-        }).then((r) => {
-            if (r.ok) refetch();
-        });
+        })
+            .then((r) => {
+                if (r.ok) {
+                    setActionError(null);
+                    refetch();
+                    return;
+                }
+                return r
+                    .json()
+                    .then((j) => setActionError(j.message ?? 'Something went wrong.'))
+                    .catch(() => setActionError(`Request failed (${r.status}).`));
+            })
+            .catch(() => setActionError('Network error — try again.'));
     };
 
     if (gone) {
@@ -309,6 +321,40 @@ export default function Show({ session }: { session: SessionProps }) {
                                     </p>
                                 ))}
 
+                                {data.me?.id === g.leader_id &&
+                                    g.pending?.length ? (
+                                    <div className="mt-3 rounded-xl border border-cyan-400/20 bg-slate-950 p-2">
+                                        <p className="text-[10px] uppercase tracking-widest text-cyan-400">
+                                            Pending requests
+                                        </p>
+                                        {g.pending?.map((p) => (
+                                            <div key={p.id} className="mt-1 flex items-center justify-between gap-2 text-xs">
+                                                <span className="truncate">{p.name}</span>
+                                                <span className="flex gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            mutate(`/s/${data.code}/groups/${g.id}/requests/${p.id}/approve`)
+                                                        }
+                                                        className="rounded bg-emerald-400/15 px-2 py-0.5 text-emerald-300"
+                                                    >
+                                                        ✓
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            mutate(`/s/${data.code}/groups/${g.id}/requests/${p.id}/reject`)
+                                                        }
+                                                        className="rounded bg-rose-400/15 px-2 py-0.5 text-rose-300"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : null}
+
                                 <ul className="mt-3 space-y-1 text-sm text-slate-300">
                                     {g.members.map((m) => (
                                         <li key={m.id} className="flex items-center gap-2">
@@ -335,7 +381,7 @@ export default function Show({ session }: { session: SessionProps }) {
                                             onClick={() => mutate(`/s/${data.code}/groups/${g.id}/join`)}
                                             className="rounded-full bg-emerald-400 px-4 py-1.5 text-xs font-bold text-emerald-950 transition active:scale-[0.97]"
                                         >
-                                            Join
+                                            {data.config.rules.join_mode === 'approval' ? 'Request to join' : 'Join'}
                                         </button>
                                     )}
                                 </div>
