@@ -36,6 +36,8 @@ config-level recipe, and everything here is locally tested via
 4. **Volumes** (persistence): mount two volumes at
    `/var/www/html/database/data` (the SQLite file — migrations live in the image,
    never shadow the whole `database` dir) and `/var/www/html/storage`.
+   Fresh volumes work out of the box: the entrypoint fixes ownership as root,
+   then drops to www-data via setpriv (verified clean-boot drill).
 5. **WebSocket proxying (AC 2)**: Dokploy's default Caddy reverse proxy passes
    HTTP/1.1 upgrade requests through; the in-container nginx already proxies
    `/app` → Reverb `127.0.0.1:8080` with upgrade headers and buffering off.

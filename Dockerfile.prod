@@ -40,13 +40,10 @@ COPY docker/prod/supervisord-groupify.conf /etc/supervisor/conf.d/groupify.conf
 COPY docker/prod/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Rootless: nginx (pid/log/cache), php-fpm (pid), supervisord (pid/sock) all
-# write under /run and their log dirs — hand them to www-data, then run
-# everything as www-data. php-fpm master as www-data inherits workers (the
-# user/group directives only apply to root masters), nginx binds :80 via the
-# NET_BIND_SERVICE capability granted in compose.
-RUN mkdir -p /var/log/nginx /var/cache/nginx /var/lib/nginx && chown -R www-data:www-data /run /var/log/nginx /var/cache/nginx /var/lib/nginx
-USER www-data
+# All runtime processes run as www-data (rootless). The entrypoint starts
+# as root ONLY to fix ownership of fresh named volumes (docker creates them
+# root-owned), then drops to www-data via su-exec before supervisord.
+RUN mkdir -p /var/log/nginx /var/cache/nginx /var/lib/nginx /var/log/supervisor && chown -R www-data:www-data /run /var/log/nginx /var/cache/nginx /var/lib/nginx /var/log/supervisor
 
 EXPOSE 80 8080
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

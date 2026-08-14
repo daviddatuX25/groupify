@@ -25,6 +25,18 @@ php artisan migrate --force
 php artisan config:cache || true
 php artisan route:cache || true
 
-# Rootless: the whole container runs as www-data (Dockerfile USER), so
-# volumes, caches, and the SQLite file are naturally www-data-owned.
-exec supervisord -c /etc/supervisor/supervisord.conf
+# Fresh named volumes arrive root-owned (docker volume create); the app runs
+# as www-data, so hand the runtime dirs over before dropping privileges.
+chown -R www-data:www-data database/data storage bootstrap/cache
+chmod -R u+rwX,g+rwX database/data storage bootstrap/cache
+
+# Everything after this point runs as www-data (nginx/php-fpm/queue/reverb/
+# scheduler) — no long-lived root processes. setpriv (util-linux) is present
+# in every Debian base; no extra package needed.
+setpriv --reuid=www-data --regid=www-data --init-groups supervisord -c /etc/supervisor/supervisord.conf &
+SUPERVISOR_PID=$!
+
+# Stream the logs back to docker stdout (children cannot write the docker
+# pipe directly as www-data — real files, tailed).
+tail -F /tmp/supervisord.log /var/log/supervisor/*.log 2>/dev/null &
+wait $SUPERVISOR_PID
