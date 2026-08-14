@@ -65,7 +65,7 @@ development_status:
 
   # Epic 4 — Flexibility Systems
   epic-4: backlog
-  4-1-session-config: ready-for-dev
+  4-1-session-config: in-progress
   4-2-fields-system: ready-for-dev
   4-3-permission-engine: ready-for-dev
   4-4-delegation-toggles: ready-for-dev

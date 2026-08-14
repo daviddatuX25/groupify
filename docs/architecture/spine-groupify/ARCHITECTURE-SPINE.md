@@ -131,7 +131,7 @@ Rule: every UI state is labeled online / reconnecting / offline; no unbounded sp
 
 # Seed (cold-start shape; the code owns it once written)
 
-Tables: `sessions` (code, pin, config JSON, status, timestamps) ·
+Tables: `group_sessions` (code, pin, config JSON, status, timestamps — named to avoid the framework `sessions` table) ·
 `participants` (session_id, token, name, email) · `groups` (session_id, name,
 leader_id, field_values JSON) · `memberships` (participant_id, group_id, role,
 status) · `session_events` (session_id, type, payload, at).
