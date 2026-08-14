@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { echo, useConnectionStatus } from '@laravel/echo-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Member = { id: number; name: string; role: string };
 type Group = {
@@ -24,17 +25,69 @@ type SessionProps = {
     config: { rules: Record<string, unknown>; fields: Field[] };
 };
 
+const CHANNEL_EVENTS = ['SessionConfigUpdated', 'SessionStateUpdated', 'GroupCreated', 'SessionDeleted'];
+
 export default function Show({ session }: { session: SessionProps }) {
     const [query, setQuery] = useState('');
     const [openOnly, setOpenOnly] = useState(true);
     const [creating, setCreating] = useState(false);
     const [createName, setCreateName] = useState('');
     const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+    const [board, setBoard] = useState<SessionProps | null>(null);
+    const [flash, setFlash] = useState<{ groupId: number; kind: 'joined' | 'left' } | null>(null);
+    const [gone, setGone] = useState(false);
+    const prevStatus = useRef<string | null>(null);
 
     const deviceToken =
         typeof window === 'undefined' ? '' : (window.localStorage.getItem('groupify.device_token') ?? '');
 
-    const mutate = (url: string, data: Record<string, unknown> = {}) => {
+    const data = board ?? session;
+
+    const refetch = () => {
+        fetch(`/api/sessions/${data.code}/board`, { headers: { 'X-Device-Token': deviceToken } })
+            .then((r) => {
+                if (r.status === 404) {
+                    setGone(true);
+                    return null;
+                }
+                return r.ok ? r.json() : null;
+            })
+            .then((json) => {
+                if (json) setBoard(json as SessionProps);
+            });
+    };
+
+    // 2-5: live events → refetch the snapshot; membership events flash the card (AD-6)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const channel = echo().channel(`session.${data.code}`);
+        CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));
+        channel.listen('MembershipChanged', (e: { group_id: number; action: string }) => {
+            if (e.action === 'joined' || e.action === 'left') {
+                setFlash({ groupId: e.group_id, kind: e.action });
+                window.setTimeout(() => setFlash(null), 1200);
+            }
+            refetch();
+        });
+        return () => {
+            CHANNEL_EVENTS.forEach((ev) => channel.stopListening(ev));
+            channel.stopListening('MembershipChanged');
+            echo().leaveChannel(`session.${data.code}`);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.code, deviceToken]);
+
+    // 2-6: reconnect → full snapshot resync (no stale board)
+    const status = useConnectionStatus();
+    useEffect(() => {
+        if (status === 'connected' && prevStatus.current !== 'connected') {
+            refetch();
+        }
+        prevStatus.current = status;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [status]);
+
+    const mutate = (url: string, payload: Record<string, unknown> = {}) => {
         const xsrf = document.cookie
             .split('; ')
             .find((c) => c.startsWith('XSRF-TOKEN='))
@@ -47,31 +100,42 @@ export default function Show({ session }: { session: SessionProps }) {
                 'X-Device-Token': deviceToken,
                 ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : {}),
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify(payload),
         }).then((r) => {
-            if (r.ok) window.location.reload();
+            if (r.ok) refetch();
         });
     };
 
+    if (gone) {
+        return (
+            <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100">
+                <div className="text-center">
+                    <p className="text-3xl font-bold">This session has ended.</p>
+                    <a href="/" className="mt-4 inline-block text-cyan-400 underline">
+                        Back home
+                    </a>
+                </div>
+            </main>
+        );
+    }
+
     const groups = useMemo(() => {
         const q = query.trim().toLowerCase();
-        return session.groups.filter((g) => {
+        return data.groups.filter((g) => {
             if (openOnly && g.open_slots <= 0) return false;
             if (!q) return true;
             const topic = Object.values(g.field_values).join(' ').toLowerCase();
             return g.name.toLowerCase().includes(q) || topic.includes(q);
         });
-    }, [session.groups, query, openOnly]);
+    }, [data.groups, query, openOnly]);
 
-    const fieldNames = session.groups[0] ? Object.keys(session.groups[0].field_values) : [];
-    const canMutate = session.status === 'live' && !(session.config.rules.freeze as boolean);
+    const fieldNames = data.groups[0] ? Object.keys(data.groups[0].field_values) : [];
+    const canMutate = data.status === 'live' && !(data.config.rules.freeze as boolean);
 
-    const meIn = session.me
-        ? session.groups.find((g) => g.members.some((m) => m.id === session.me?.id))
-        : undefined;
+    const meIn = data.me ? data.groups.find((g) => g.members.some((m) => m.id === data.me?.id)) : undefined;
 
     const submitCreate = () => {
-        mutate(`/s/${session.code}/groups`, { name: createName, field_values: fieldValues });
+        mutate(`/s/${data.code}/groups`, { name: createName, field_values: fieldValues });
         setCreating(false);
     };
 
@@ -82,8 +146,8 @@ export default function Show({ session }: { session: SessionProps }) {
                 Joining late? Open{' '}
                 <span className="font-mono text-cyan-400">
                     {typeof window !== 'undefined'
-                        ? `${window.location.origin}/join/${session.code}`
-                        : `/join/${session.code}`}
+                        ? `${window.location.origin}/join/${data.code}`
+                        : `/join/${data.code}`}
                 </span>{' '}
                 and enter the PIN from your host.
             </div>
@@ -93,30 +157,30 @@ export default function Show({ session }: { session: SessionProps }) {
                     <div>
                         <h1 className="text-xl font-extrabold tracking-tight">Groupify</h1>
                         <p className="mt-0.5 text-xs text-slate-500">
-                            {session.presence} online · {session.pool.length} in the pool
+                            {data.presence} online · {data.pool.length} in the pool
                         </p>
                     </div>
                     <span className="flex items-center gap-2 font-mono text-sm text-cyan-400">
                         <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
-                        {session.code}
+                        {data.code}
                     </span>
                 </header>
 
-                {session.me && (
+                {data.me && (
                     <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4">
-                        {session.me.pooled ? (
+                        {data.me.pooled ? (
                             <p>
-                                <span className="font-bold">{session.me.name}</span> — you&rsquo;re in the
-                                pool ({session.pool.length}).
+                                <span className="font-bold">{data.me.name}</span> — you&rsquo;re in the
+                                pool ({data.pool.length}).
                             </p>
                         ) : (
                             <p>
-                                <span className="font-bold">{session.me.name}</span> — you&rsquo;re in{' '}
+                                <span className="font-bold">{data.me.name}</span> — you&rsquo;re in{' '}
                                 <span className="text-emerald-400">{meIn?.name}</span>.
                             </p>
                         )}
                         {canMutate &&
-                            session.me.pooled && (
+                            data.me.pooled && (
                                 <button
                                     type="button"
                                     onClick={() => setCreating((c) => !c)}
@@ -128,7 +192,7 @@ export default function Show({ session }: { session: SessionProps }) {
                         {canMutate && meIn && (
                             <button
                                 type="button"
-                                onClick={() => mutate(`/s/${session.code}/groups/${meIn.id}/leave`)}
+                                onClick={() => mutate(`/s/${data.code}/groups/${meIn.id}/leave`)}
                                 className="rounded-full border border-white/10 px-5 py-2 text-sm text-slate-300 transition hover:bg-slate-800"
                             >
                                 Leave {meIn.name}
@@ -143,7 +207,6 @@ export default function Show({ session }: { session: SessionProps }) {
                         onSubmit={(e) => {
                             e.preventDefault();
                             submitCreate();
-                            setCreating(false);
                         }}
                     >
                         <p className="text-sm font-bold uppercase tracking-wide text-cyan-400">Create a group</p>
@@ -154,7 +217,7 @@ export default function Show({ session }: { session: SessionProps }) {
                             onChange={(e) => setCreateName(e.target.value)}
                             className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-2.5 outline-none focus:border-cyan-400"
                         />
-                        {session.config.fields.map((f) => (
+                        {data.config.fields.map((f) => (
                             <input
                                 key={f.name}
                                 type="text"
@@ -200,14 +263,19 @@ export default function Show({ session }: { session: SessionProps }) {
                     )}
                     {groups.map((g) => {
                         const full = g.open_slots <= 0;
+                        const isFlashing = flash?.groupId === g.id;
+                        const flashStyle =
+                            isFlashing && flash?.kind === 'joined'
+                                ? 'border-emerald-400 shadow-[0_0_20px_rgba(78,222,163,0.35)]'
+                                : isFlashing && flash?.kind === 'left'
+                                  ? 'border-rose-400/60 shadow-[0_0_20px_rgba(244,63,94,0.25)]'
+                                  : 'border-white/10';
                         return (
                             <article
                                 key={g.id}
                                 className={`relative overflow-hidden rounded-2xl border p-5 transition ${
-                                    full
-                                        ? 'border-white/10 opacity-70'
-                                        : 'border-white/10 hover:border-emerald-400/50'
-                                } bg-slate-900`}
+                                    full ? 'opacity-70' : 'hover:border-emerald-400/50'
+                                } ${flashStyle} bg-slate-900`}
                             >
                                 <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400 opacity-40" />
                                 <div className="flex items-start justify-between">
@@ -255,10 +323,10 @@ export default function Show({ session }: { session: SessionProps }) {
                                     <p className="text-xs text-slate-500">
                                         {full ? 'FULL' : `${g.open_slots} open`}
                                     </p>
-                                    {canMutate && session.me?.pooled && !full && (
+                                    {canMutate && data.me?.pooled && !full && (
                                         <button
                                             type="button"
-                                            onClick={() => mutate(`/s/${session.code}/groups/${g.id}/join`)}
+                                            onClick={() => mutate(`/s/${data.code}/groups/${g.id}/join`)}
                                             className="rounded-full bg-emerald-400 px-4 py-1.5 text-xs font-bold text-emerald-950 transition active:scale-[0.97]"
                                         >
                                             Join

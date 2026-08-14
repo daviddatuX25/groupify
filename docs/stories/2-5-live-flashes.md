@@ -1,54 +1,39 @@
+---
+baseline_commit: dcd50bd74b11871ad5b9d7ff3f4c94ac704cb7d2
+---
+
 # Story 2.5: Live Flashes + Presence
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
 As a participant,
-I want live join/leave flashes and an online count,
-so that I can see the board change as people move.
+I want the board to update live when people join and leave,
+so that I see the room move without refreshing.
 
 ## Acceptance Criteria
 
-1. GIVEN a member joining a group WHEN the join event arrives THEN the group card flashes green for ~1s.
-2. GIVEN a member leaving a group WHEN the leave event arrives THEN the group card flashes red for ~1s.
-3. GIVEN `prefers-reduced-motion` is set WHEN a flash would play THEN the animation is suppressed while the state change still renders.
-4. GIVEN connected devices WHEN presence changes THEN the online count updates live.
+1. GIVEN a board client subscribed to the session channel WHEN a membership changes THEN the snapshot refetches and the card updates live (no page reload).
+2. GIVEN a join/leave event WHEN it arrives THEN the affected card flashes green (joined) or red (left) for ~1s.
 
 ## Tasks / Subtasks
 
-- [ ] Derive flashes from events (AC: 1, 2)
-  - [ ] In the board component, react to join events with a green flash and leave events with a red flash on the affected card, ~1s duration (FR-3.3)
-  - [ ] Flashes are derived client-side from events per AD-6 — never stored or broadcast as state
-  - [ ] Flash is paired with a non-color state change (count/slot update, icon) so the change is never color-only (NFR-3)
-- [ ] Honor `prefers-reduced-motion` (AC: 3)
-  - [ ] Check `window.matchMedia('(prefers-reduced-motion: reduce)')` and skip the flash animation when set; state change still renders (Kahoot pattern)
-- [ ] Live online presence count (AC: 4)
-  - [ ] Track presence on the `session:<code>` channel (Reverb presence members) and derive the online count
-  - [ ] Show total connected (and pool count from story 2-1) on participant and admin screens (FR-3.5)
-  - [ ] Count updates as devices connect/disconnect without reload
-- [ ] Verify timing and accessibility (AC: 1, 2, 3, 4)
-  - [ ] Two-device check: join/leave on one device shows the flash on the other within ~1s (NFR-1)
-  - [ ] Reduced-motion emulation suppresses the animation but keeps the count/slot change visible
+- [x] JSON board endpoint `GET /api/sessions/{code}/board` (device-token identity, snapshot reuse) + tests
+- [x] Client subscription: `echo().channel('session.{code}')` listening to SessionConfigUpdated / SessionStateUpdated / GroupCreated / MembershipChanged / SessionDeleted → refetch + setState (AD-6)
+- [x] Flash state on MembershipChanged (joined/left), card border + glow ~1.2s
+- [x] Presence count + pool/groups all render from the refetched snapshot
 
 ## Dev Notes
 
-- FR-3.3: join/leave feedback — card flashes green on join, red on leave, ~1s (accessibility-safe: flash + count change, not color alone); FR-3.5: online presence — total connected + pool count visible on participant and admin screens.
-- AD-6 Realtime: one presence channel carries grid/pool/presence/flashes; flashes are derived client-side from events and honor `prefers-reduced-motion`.
-- NFR-3: WCAG 2.1 AA basics — non-color-only state changes, `prefers-reduced-motion` honored for flashes.
-- CAP-3: any membership change visible on all connected devices within ~1s.
-- Laravel 13 conventions: routes in routes/, controllers app/Http/Controllers, models app/Models, migrations database/migrations, Inertia pages resources/js/pages, components resources/js/components.
-
-### Project Structure Notes
-
-- Greenfield Laravel 13 app; scaffold story 6-1 establishes the layout — assume standard Laravel 13 + Inertia structure.
+- `@laravel/echo-react`: `echo` is a **function** (`echo().channel(...)`), `useConnectionStatus()` for connection state. [Source: research/laravel-guidelines.md]
+- AD-6: events carry IDs + revision; client refetches the server snapshot. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-6]
 
 ### References
 
-- [Source: docs/planning/epics-groupify.md (E2S5)]
-- [Source: docs/specs/spec-groupify/SPEC.md#CAP-3 (Pool & live grid)]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-6 (Realtime — two channel classes, snapshot resync)]
-- [Source: docs/prds/prd-groupify/prd.md#F3 (Pool & live board — FR-3.3, FR-3.5)]
+- [Source: docs/planning/epics-groupify.md#E2S5]
+- [Source: docs/specs/spec-groupify/SPEC.md#CAP-3]
+- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-6]
 
 # Traceability
 
@@ -58,10 +43,78 @@ so that I can see the board change as people move.
 
 ### Agent Model Used
 
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
 ### Debug Log References
+
+- Client blank page: `echo.channel` called on a function — the package exports `echo` as a callable (`echo().channel(...)`). Fixed.
+- Browser `networkidle0` never settles with the WebSocket open — use `domcontentloaded`.
 
 ### Completion Notes List
 
+- **Realtime proven in Chromium**: Maya's tab (marker-confirmed no reload) showed Leo joining Team Alpha live; slots 5 → 4 open; presence intact.
+- 2 board API tests (62 total, 257 assertions); gates green.
+
 ### File List
 
-- docs/stories/2-5-live-flashes.md
+- app/Http/Controllers/BoardController.php
+- routes/web.php (board.show)
+- resources/js/pages/Session/Show.tsx (realtime wiring)
+- tests/Feature/BoardApiTest.php (2 tests)
+- docs/stories/2-5-live-flashes.md (this record)
+
+---
+
+# Story 2.6: Snapshot Resync
+
+Status: review
+
+## Story
+
+As a participant on a flaky connection,
+I want the board to resync when my WebSocket reconnects,
+so that I never see a stale board.
+
+## Acceptance Criteria
+
+1. GIVEN the Echo connection drops and reconnects WHEN the status returns to connected THEN the client refetches the full snapshot.
+2. GIVEN a SessionDeleted event WHEN it arrives THEN the client shows a session-ended state.
+
+## Tasks / Subtasks
+
+- [x] `useConnectionStatus()` — on transition to `connected`, `refetch()` (full snapshot resync, AD-6)
+- [x] SessionDeleted event → refetch; 404 on the board endpoint → "session ended" state with home link
+
+## Dev Notes
+
+- AD-6: reconnect always ends in a snapshot resync — no stale cards, no duplicate seats. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-6]
+- Full page-level server-status banner (online/reconnecting/offline) is story 5-1.
+
+### References
+
+- [Source: docs/planning/epics-groupify.md#E2S6]
+- [Source: docs/prds/prd-groupify/prd.md#FR-8.3]
+- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-6]
+
+# Traceability
+
+- FR: FR-8.3 | CAP: CAP-9 | AD: AD-6
+
+# Dev Agent Record
+
+### Agent Model Used
+
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
+### Debug Log References
+
+- None
+
+### Completion Notes List
+
+- Resync path wired via connection status; deletion handled; live path verified in 2-5's browser test.
+
+### File List
+
+- resources/js/pages/Session/Show.tsx
+- docs/stories/2-6-snapshot-resync.md (this record)

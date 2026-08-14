@@ -48,8 +48,8 @@ development_status:
   2-2-grid-board: review
   2-3-create-group: review
   2-4-join-leave-group: review
-  2-5-live-flashes: ready-for-dev
-  2-6-snapshot-resync: ready-for-dev
+  2-5-live-flashes: review
+  2-6-snapshot-resync: review
   epic-2-retrospective: optional
 
   # Epic 3 — Admin Control
