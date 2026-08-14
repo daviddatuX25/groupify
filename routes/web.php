@@ -53,6 +53,8 @@ Route::patch('/admin/sessions/{session}/state', [SessionStateController::class, 
     ->name('admin.sessions.state.update');
 Route::delete('/admin/sessions/{session}', [SessionStateController::class, 'destroy'])
     ->name('admin.sessions.destroy');
+Route::post('/admin/sessions/{session}/members/{participant}/role', [AdminActionsController::class, 'assignRole'])
+    ->name('admin.members.role');
 Route::post('/admin/sessions/{session}/members/{participant}/move', [AdminActionsController::class, 'move'])
     ->name('admin.members.move');
 Route::post('/admin/sessions/{session}/auto-distribute', [AdminActionsController::class, 'distribute'])

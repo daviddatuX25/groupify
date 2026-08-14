@@ -106,6 +106,24 @@ class AdminActionsController
         return response()->json(['ok' => true, 'affected' => $affected]);
     }
 
+    /** Assign or clear a session custom role (CAP-7). */
+    public function assignRole(Request $request, Session $session, Participant $participant): JsonResponse
+    {
+        $this->authorizeAdmin($session, $request);
+
+        abort_unless($participant->group_session_id === $session->id, 404);
+
+        $role = $request->validate(['role' => ['nullable', 'string', 'max:40']])['role'] ?? null;
+
+        if ($role !== null && ! array_key_exists($role, $session->config->roles())) {
+            throw ValidationException::withMessages(['role' => 'Unknown role: '.$role]);
+        }
+
+        $participant->update(['custom_role' => $role]);
+
+        return response()->json(['ok' => true, 'custom_role' => $role]);
+    }
+
     /** Auto-distribute all pooled participants into groups with space (mockup Auto-Distribute). */
     public function distribute(Request $request, Session $session): JsonResponse
     {

@@ -36,7 +36,7 @@ class SessionSnapshot
             ->where('group_session_id', $session->id)
             ->whereNotIn('id', $activeMemberIds)
             ->orderBy('name')
-            ->get(['id', 'name', 'display_name']);
+            ->get(['id', 'name', 'display_name', 'custom_role']);
 
         return [
             'code' => $session->code,
@@ -47,6 +47,7 @@ class SessionSnapshot
             'pool' => $pool->map(fn ($p) => [
                 'id' => $p->id,
                 'name' => $p->display_name ?? $p->name,
+                'custom_role' => $p->custom_role,
             ])->values(),
             'groups' => $groups->map(fn (Group $group) => [
                 'id' => $group->id,

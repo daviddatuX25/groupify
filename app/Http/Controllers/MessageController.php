@@ -84,7 +84,13 @@ class MessageController
             $status = $mode === 'moderated' ? 'pending' : 'visible';
         } elseif ($data['scope'] === 'announcement') {
             $perms = app(PermissionService::class);
-            abort_unless($isAdmin && $perms->can('announce', 'admin', $session->config), 404);
+            $canAnnounce = $isAdmin && $perms->can('announce', 'admin', $session->config);
+            if (! $canAnnounce && ! $isAdmin) {
+                $me = $this->participant($request, $session);
+                $canAnnounce = $me->custom_role !== null
+                    && $perms->can('announce', $me->custom_role, $session->config);
+            }
+            abort_unless($canAnnounce, 404);
         } else {
             $me = $this->participant($request, $session);
             /** @var Group $group */

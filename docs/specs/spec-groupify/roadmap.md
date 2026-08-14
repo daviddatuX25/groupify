@@ -31,7 +31,7 @@ Phasing preserves the full vision (locked decision: cut scope, never the vision)
 - Proxy mode + bulk importer (field-trip use case)
 - Auto-dissolve timer (pending); ~~match-me auto-assign~~ — **SHIPPED with Auto-Distribute (phase-2 story B, 2026-08-14)**
 - Device binding (FingerprintJS; convenience-grade)
-- Group quiz extension, custom roles
+- Group quiz extension (pending); ~~custom roles~~ — **SHIPPED (phase-2 story J, 2026-08-14)**
 - PWA shell
 - ~~Gated entry / guest lists~~ — **SHIPPED (phase-2 story D, 2026-08-14)**
 - ~~Anonymous mode~~ — **SHIPPED (phase-2 story E, 2026-08-14)**

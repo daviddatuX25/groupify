@@ -22,7 +22,7 @@ class SessionConfigController
 
         $merged = array_replace_recursive(
             $session->config->toArray(),
-            $request->only(['rules', 'fields', 'perms', 'extensions'])
+            $request->only(['rules', 'fields', 'perms', 'extensions', 'roles'])
         );
 
         $validated = Validator::make($merged, self::rules())->validate();
@@ -82,6 +82,9 @@ class SessionConfigController
             'fields.*.in_csv' => ['sometimes', 'boolean'],
             'fields.*.filterable' => ['sometimes', 'boolean'],
             'perms' => ['array'],
+            'roles' => ['array'],
+            'roles.*' => ['array'],
+            'roles.*.*' => ['string'],
             'extensions' => ['array'],
             'extensions.*' => ['string', 'max:60'],
         ];

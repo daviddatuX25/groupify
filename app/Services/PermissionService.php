@@ -15,6 +15,11 @@ class PermissionService
 {
     public function can(string $action, string $role, SessionConfig $config): bool
     {
+        $roles = $config->roles();
+        if (isset($roles[$role])) {
+            return in_array($action, $roles[$role], true);
+        }
+
         $perms = $config->perms();
 
         if (isset($perms[$action][$role])) {

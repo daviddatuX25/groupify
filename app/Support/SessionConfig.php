@@ -42,6 +42,7 @@ class SessionConfig implements Arrayable, JsonSerializable
                 'global_chat_mode' => 'open', // open | muted | moderated
             ],
             'fields' => [],
+            'roles' => [],
             'perms' => [],
             'extensions' => [],
         ];
@@ -85,6 +86,12 @@ class SessionConfig implements Arrayable, JsonSerializable
     public function perms(): array
     {
         return $this->data['perms'] ?? [];
+    }
+
+    /** @return array<string, array<int, string>> */
+    public function roles(): array
+    {
+        return $this->data['roles'] ?? [];
     }
 
     /** @return array<int, string> */

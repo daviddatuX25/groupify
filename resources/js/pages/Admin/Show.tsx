@@ -38,6 +38,8 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [guestListText, setGuestListText] = useState('');
     const [templateName, setTemplateName] = useState('');
     const [announceDraft, setAnnounceDraft] = useState('');
+    const [roleName, setRoleName] = useState('');
+    const [roleActions, setRoleActions] = useState('');
     const [modQueue, setModQueue] = useState<{ id: number; scope: string; author: string; body: string }[]>([]);
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
 
@@ -383,6 +385,32 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                         >
                             <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#4edea3]" />
                             {p.name}
+                            <select
+                                className="rounded bg-slate-950 px-1 py-0.5 text-xs text-slate-400 outline-none"
+                                value={p.custom_role ?? ''}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    void fetch(`/admin/sessions/${session.id}/members/${p.id}/role`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            Accept: 'application/json',
+                                            'X-Admin-Token': adminToken,
+                                            'X-XSRF-TOKEN': decodeURIComponent(
+                                                document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                            ),
+                                        },
+                                        body: JSON.stringify({ role: v === '' ? null : v }),
+                                    }).then((r) => { if (r.ok) refetch(); });
+                                }}
+                            >
+                                <option value="">role…</option>
+                                {Object.keys((data.config.roles ?? {}) as Record<string, string[]>).map((r) => (
+                                    <option key={r} value={r}>
+                                        {r}
+                                    </option>
+                                ))}
+                            </select>
                         </span>
                     ))}
                     {data.pool.length === 0 && <p className="text-sm text-slate-500">Everyone is grouped.</p>}
@@ -476,6 +504,55 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                         </div>
                     </div>
                 )}
+
+                {/* Custom roles (phase-2 J) */}
+                <div className="mt-8 flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 p-4">
+                    <span className="text-sm font-bold uppercase tracking-wide text-slate-400">Roles</span>
+                    <input
+                        type="text"
+                        placeholder="role name"
+                        value={roleName}
+                        onChange={(e) => setRoleName(e.target.value)}
+                        className="w-32 rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-sm outline-none focus:border-cyan-400"
+                    />
+                    <input
+                        type="text"
+                        placeholder="actions (comma)"
+                        value={roleActions}
+                        onChange={(e) => setRoleActions(e.target.value)}
+                        className="w-64 rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-sm outline-none focus:border-cyan-400"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const name = roleName.trim();
+                            const actions = roleActions.split(',').map((a) => a.trim()).filter(Boolean);
+                            if (!name) return;
+                            const roles = (data.config.roles ?? {}) as Record<string, string[]>;
+                            roles[name] = actions;
+                            void fetch(`/admin/sessions/${session.id}/config`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    Accept: 'application/json',
+                                    'X-Admin-Token': adminToken,
+                                    'X-XSRF-TOKEN': decodeURIComponent(
+                                        document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                    ),
+                                },
+                                body: JSON.stringify({ roles }),
+                            }).then((r) => { if (r.ok) { setRoleName(''); setRoleActions(''); refetch(); } });
+                        }}
+                        className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+                    >
+                        Define role
+                    </button>
+                    {Object.entries((data.config.roles ?? {}) as Record<string, string[]>).map(([name, actions]) => (
+                        <span key={name} className="rounded-full border border-cyan-400/20 bg-slate-950 px-3 py-1 text-xs text-cyan-300">
+                            {name}: {actions.join(', ')}
+                        </span>
+                    ))}
+                </div>
 
                 {modQueue.length > 0 && (
                     <div className="mt-8 rounded-2xl border border-amber-400/20 bg-slate-900 p-4">
