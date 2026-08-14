@@ -1,6 +1,10 @@
+---
+baseline_commit: 54b971d272df3d650fc79091eb15a3851f258bff
+---
+
 # Story 1.1: Session Create
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -17,42 +21,40 @@ so that participants can join and I can manage the session from the admin panel.
 
 ## Tasks / Subtasks
 
-- [ ] Create the `sessions` migration and model (AC: 1)
-  - [ ] `database/migrations/…_create_sessions_table.php`: code, pin, config JSON, status, timestamps; unique index on `code`
-  - [ ] `app/Models/Session.php` with casts for `config` and relations to participants/groups/memberships/session_events
-  - [ ] Store the admin_token (bearer) on the session row; 6-digit numeric code + random 4-digit PIN generated at creation
-- [ ] Build the create-session flow at `/new` (AC: 1, 2)
-  - [ ] Route `POST /sessions` in routes/web.php → `SessionController@store` in app/Http/Controllers
-  - [ ] Generate a unique 6-digit code (retry on collision) and random 4-digit PIN; validate code format
-  - [ ] Seed default config JSON per AD-4: rules (min 3 / max 6, join mode open, allow user creation, naming "Team Alpha…"), empty fields, perms, extensions (AC: 2)
-  - [ ] Return the admin panel URL containing the admin_token; redirect creator into the admin panel (AC: 3)
-- [ ] Guard the admin panel route (AC: 4)
-  - [ ] Admin routes authorize by comparing the admin_token query/header against the session's stored token (AD-3)
-  - [ ] Reject (404/redirect) admin panel requests without a matching admin_token
-- [ ] Create the New Session Inertia page (AC: 1, 2)
-  - [ ] `resources/js/pages/Admin/New.tsx` with the create form; rules fields (min/max, join mode, naming scheme) pre-filled with defaults (AC: 2)
-  - [ ] Submit via Inertia; on success redirect to the admin panel page `resources/js/pages/Admin/Show.tsx`
-  - [ ] Show validation errors inline on failed create
+- [x] Sessions migration and model (AC: 1) — landed with story 4-1
+  - [x] `group_sessions` migration: code (unique 6-digit), pin (4-digit), config JSON, status, timestamps, admin_token
+  - [x] `app/Models/Session.php` with SessionConfig cast; relations to participants/groups/memberships deferred to E2 (tables land there)
+  - [x] Bearer admin_token stored on the row; 6-digit numeric code + 4-digit PIN generated at creation
+- [x] Create-session flow at `/new` (AC: 1, 2)
+  - [x] `GET /new` → `Admin/New` Inertia page; `POST /sessions` → `SessionController@store` (routes/web.php)
+  - [x] Unique 6-digit code with collision retry (10 attempts + UniqueConstraintViolationException catch); 4-digit PIN; Str::random(40) admin token
+  - [x] Default config seeded (min 3 / max 6 / join open / allow creation / naming alpha) — AC 2
+  - [x] Redirect to admin panel URL with token — AC 3
+- [x] Guard the admin panel route (AC: 4)
+  - [x] `AdminPanelController@show` — hash_equals against stored admin_token (query or X-Admin-Token header)
+  - [x] Invalid/missing token → 404 (no existence leak)
+- [x] New Session Inertia page (AC: 1, 2)
+  - [x] `resources/js/pages/Admin/New.tsx` — create form, submits POST /sessions, inline errors, loading state
+  - [x] `resources/js/pages/Admin/Show.tsx` — session code + PIN shell; persists admin_token to localStorage for later X-Admin-Token calls (AD-3); QR/stats in 3-1
 
 ## Dev Notes
 
-- AD-3 Identity: no users table — admin identity is the per-session admin_token; every session-scoped request is authorized by token (participant or admin); tokens are bearer and revocable only by session delete/archive.
-- AD-4 Session config object: rules/fields/perms/extensions live in ONE validated config JSON per session; feature code never reads ad-hoc columns; adding a setting = extending the config schema.
-- AD-1: every mutation is an HTTP action that commits a transaction, then broadcasts; SQLite is the only source of truth.
-- Seed shape (ARCHITECTURE-SPINE.md#Seed): `sessions` table = (code, pin, config JSON, status, timestamps); channels `session:<code>` and `admin:<code>`.
-- Laravel 13 conventions: routes in routes/, controllers app/Http/Controllers, models app/Models, migrations database/migrations, Inertia pages resources/js/pages, components resources/js/components.
+- AD-3: no accounts — admin identity is the per-session token; tokens are bearer, revocable only by session delete/archive. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-3]
+- AD-4: default config seeded at creation; feature code reads config only through the resolver. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-4]
+- Code format locked: 6-digit numeric (research: Quizizz/Blooket/Slido convention; no case-sensitive alphanumerics). [Source: research/interface-research.md]
+- CSRF (PreventRequestForgery, Laravel 13): active in production; React client sends XSRF cookie automatically. Curl smoke required the cookie dance — verified 302 → 200 → 404 chain over live HTTP.
 
 ### Project Structure Notes
 
-- Greenfield Laravel 13 app; scaffold story 6-1 establishes the layout — assume standard Laravel 13 + Inertia structure.
+- Pages: resources/js/pages/Admin/{New,Show}.tsx. Routes: sessions.new / sessions.store / admin.sessions.show.
+- Admin token persisted client-side under `groupify.admin_token` (localStorage) — mirrors participant token pattern (1-4).
 
 ### References
 
-- [Source: docs/planning/epics-groupify.md (E1S1)]
-- [Source: docs/specs/spec-groupify/SPEC.md#CAP-1 (Session lifecycle)]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-3 (Identity — device token + session, no accounts)]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-4 (Session config object — single source of truth)]
-- [Source: docs/prds/prd-groupify/prd.md#F1 (Session management — FR-1.1, FR-1.2)]
+- [Source: docs/planning/epics-groupify.md#E1S1]
+- [Source: docs/specs/spec-groupify/SPEC.md#CAP-1]
+- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-3]
+- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-4]
 
 # Traceability
 
@@ -62,10 +64,23 @@ so that participants can join and I can manage the session from the admin panel.
 
 ### Agent Model Used
 
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
 ### Debug Log References
+
+- curl POST returned 419 — CSRF working as intended (client sends XSRF cookie; curl needed cookie jar + X-XSRF-TOKEN)
 
 ### Completion Notes List
 
+- All 4 ACs verified: unit (7 tests) + live HTTP smoke (GET /new SSR renders; POST → 302 to token URL; admin 200; no-token 404).
+- Gates green: pest 19/19 (94 assertions), pint + phpstan clean, `npm run build` ✓ (557 modules).
+
 ### File List
 
-- docs/stories/1-1-session-create.md
+- app/Http/Controllers/SessionController.php
+- app/Http/Controllers/Admin/AdminPanelController.php
+- routes/web.php
+- resources/js/pages/Admin/New.tsx
+- resources/js/pages/Admin/Show.tsx
+- tests/Feature/SessionCreateTest.php (7 tests)
+- docs/stories/1-1-session-create.md (this record)
