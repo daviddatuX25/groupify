@@ -11,7 +11,7 @@ class SessionPageController
     /** GET /s/{code} — participant home (pool + board arrive in Epic 2). */
     public function show(Session $session): Response
     {
-        abort_unless(in_array($session->status, ['live', 'frozen'], true), 404);
+        abort_unless(in_array($session->status, ['live', 'frozen', 'archived'], true), 404);
 
         return Inertia::render('Session/Show', [
             'session' => [

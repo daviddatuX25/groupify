@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Controllers\Admin\SessionConfigController;
+use App\Http\Controllers\Admin\SessionStateController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SessionPageController;
@@ -23,3 +24,7 @@ Route::get('/s/{session:code}', [SessionPageController::class, 'show'])->name('s
 Route::get('/admin/sessions/{session}', [AdminPanelController::class, 'show'])->name('admin.sessions.show');
 Route::put('/admin/sessions/{session}/config', [SessionConfigController::class, 'update'])
     ->name('admin.sessions.config.update');
+Route::patch('/admin/sessions/{session}/state', [SessionStateController::class, 'update'])
+    ->name('admin.sessions.state.update');
+Route::delete('/admin/sessions/{session}', [SessionStateController::class, 'destroy'])
+    ->name('admin.sessions.destroy');

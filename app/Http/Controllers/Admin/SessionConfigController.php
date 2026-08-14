@@ -11,12 +11,12 @@ use Illuminate\Support\Facades\Validator;
 
 class SessionConfigController
 {
+    use AuthorizesAdminToken;
+
     /** Admin-only config update (AD-3 token auth). Merge + validate + commit + broadcast (AD-1). */
     public function update(Request $request, Session $session): JsonResponse
     {
-        if (! hash_equals((string) $session->admin_token, (string) $request->header('X-Admin-Token', ''))) {
-            abort(403, 'Invalid admin token.');
-        }
+        $this->authorizeAdmin($session, $request);
 
         $merged = array_replace_recursive(
             $session->config->toArray(),

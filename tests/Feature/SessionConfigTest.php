@@ -87,7 +87,7 @@ it('rejects updates without a valid admin token', function () {
         route('admin.sessions.config.update', $this->session),
         ['rules' => ['min_members' => 2]],
         ['Accept' => 'application/json']
-    )->assertStatus(403);
+    )->assertNotFound();
 });
 
 it('updates config and broadcasts the change', function () {

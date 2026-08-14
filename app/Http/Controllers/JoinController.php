@@ -43,7 +43,7 @@ class JoinController
     /** POST /join/{code} — validate PIN + identity, create/reuse the seat (AD-7). */
     public function store(Request $request, Session $session): RedirectResponse
     {
-        if ($session->status !== 'live') {
+        if ($session->status !== 'live' || $session->config->rules()['freeze']) {
             abort(404);
         }
 
