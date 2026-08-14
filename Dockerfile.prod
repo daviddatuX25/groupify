@@ -42,3 +42,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80 8080
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+# Docker-level liveness (Dokploy shows container health from this)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
+    CMD curl -fsS http://127.0.0.1/health || exit 1

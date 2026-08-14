@@ -12,6 +12,9 @@ config-level recipe, and everything here is locally tested via
 
 ## Steps (Dokploy UI)
 
+0. **Git remote** — Dokploy deploys from a git repository. Push this repo to
+   GitHub/Gitea and use that remote (no remote is configured yet).
+
 1. **Create application** — Docker (Git) type:
    - Repository: your Groupify git remote, branch `main`.
    - Build type: **Dockerfile** with path `Dockerfile.prod`.

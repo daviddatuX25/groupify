@@ -44,6 +44,18 @@ services:
         limits:
           memory: 768M
           cpus: "1.5"
+    security_opt:
+      - no-new-privileges:true
+    # Drop the dangerous capabilities; keep what php-fpm (setuid to www-data)
+    # and nginx (:80) need. Full cap_drop breaks the entrypoint + php-fpm.
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_PTRACE
+      - MKNOD
+      - AUDIT_WRITE
+      - SETFCAP
     restart: unless-stopped
 
 volumes:
