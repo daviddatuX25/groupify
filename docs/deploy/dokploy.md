@@ -29,6 +29,7 @@ config-level recipe, and everything here is locally tested via
    - `QUEUE_CONNECTION=database`, `CACHE_STORE=database`, `SESSION_DRIVER=database`
    - `BROADCAST_CONNECTION=reverb`
    - `REVERB_APP_ID/KEY/SECRET` (real random values), `REVERB_HOST=127.0.0.1`, `REVERB_PORT=8080`, `REVERB_SCHEME=http`
+   - `DB_BUSY_TIMEOUT=30000` (SQLite write contention with the queue worker + scheduler)
 4. **Volumes** (persistence): mount two volumes at
    `/var/www/html/database` and `/var/www/html/storage`.
 5. **WebSocket proxying (AC 2)**: Dokploy's default Caddy reverse proxy passes

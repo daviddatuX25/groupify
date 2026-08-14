@@ -34,6 +34,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [showJoinInfo, setShowJoinInfo] = useState(true);
     const [showBoard, setShowBoard] = useState(true);
     const [activity, setActivity] = useState<{ type: string; payload: Record<string, unknown>; at: string }[]>([]);
+    const [timerMin, setTimerMin] = useState('');
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
     if (typeof window !== 'undefined' && session.admin_token) {
@@ -168,7 +169,36 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
 
                     <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-900 p-5 md:col-span-9">
                         <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                    type="number"
+                                    min={1}
+                                    placeholder="Auto-dissolve (min)"
+                                    value={timerMin}
+                                    onChange={(e) => setTimerMin(e.target.value)}
+                                    className="w-36 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const v = timerMin.trim();
+                                        fetch(`/admin/sessions/${session.id}/config`, {
+                                            method: 'PUT',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                Accept: 'application/json',
+                                                'X-Admin-Token': adminToken,
+                                                'X-XSRF-TOKEN': decodeURIComponent(
+                                                    document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                                ),
+                                            },
+                                            body: JSON.stringify({ rules: { auto_dissolve_minutes: v === '' ? null : Number(v) } }),
+                                        }).then((r) => { if (r.ok) { refetch(); setTimerMin(''); } });
+                                    }}
+                                    className="rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+                                >
+                                    Set timer
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => patchState(frozen ? 'unfreeze' : 'freeze')}

@@ -12,5 +12,6 @@ fi
 npm run dev -- --host 0.0.0.0 --port 5173 &
 php artisan queue:listen --tries=1 &
 php artisan reverb:start --host=0.0.0.0 --port=8080 &
+php artisan schedule:work &
 
 exec php artisan serve --host=0.0.0.0 --port=8000

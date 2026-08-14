@@ -21,6 +21,7 @@ type Me = { id: number; name: string; pooled: boolean } | null;
 type SessionProps = {
     code: string;
     status: string;
+    dissolve_at?: string | null;
     presence: number;
     pool: { id: number; name: string }[];
     groups: Group[];
@@ -40,6 +41,7 @@ export default function Show({ session }: { session: SessionProps }) {
     const [flash, setFlash] = useState<{ groupId: number; kind: 'joined' | 'left' } | null>(null);
     const [gone, setGone] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
+    const [nowTick, setNowTick] = useState(Date.now());
     const prevStatus = useRef<string | null>(null);
 
     const deviceToken =
@@ -83,6 +85,13 @@ export default function Show({ session }: { session: SessionProps }) {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.code, deviceToken]);
+
+    // Auto-dissolve countdown ticker
+    useEffect(() => {
+        if (!data.dissolve_at) return;
+        const t = window.setInterval(() => setNowTick(Date.now()), 1000);
+        return () => window.clearInterval(t);
+    }, [data.dissolve_at]);
 
     // 2-6: reconnect → full snapshot resync (no stale board)
     const status = useConnectionStatus();
@@ -178,9 +187,16 @@ export default function Show({ session }: { session: SessionProps }) {
                             {data.presence} online · {data.pool.length} in the pool
                         </p>
                     </div>
-                    <span className="flex items-center gap-2 font-mono text-sm text-cyan-400">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
-                        {data.code}
+                    <span className="flex items-center gap-3">
+                        {data.dissolve_at && (
+                            <span className="font-mono text-xs text-rose-300">
+                                groups dissolve in {Math.max(0, Math.ceil((new Date(data.dissolve_at).getTime() - nowTick) / 1000))}s
+                            </span>
+                        )}
+                        <span className="flex items-center gap-2 font-mono text-sm text-cyan-400">
+                            <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
+                            {data.code}
+                        </span>
                     </span>
                 </header>
 

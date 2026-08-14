@@ -39,6 +39,9 @@ class SessionConfigController
 
         $session->update(['config' => $data]);
 
+        $minutes = $data['rules']['auto_dissolve_minutes'] ?? null;
+        $session->update(['dissolve_at' => $minutes !== null ? now()->addMinutes((int) $minutes) : null]);
+
         broadcast(new SessionConfigUpdated($session))->toOthers();
 
         return response()->json([
@@ -63,6 +66,7 @@ class SessionConfigController
             'rules.allow_user_creation' => ['required', 'boolean'],
             'rules.naming' => ['required', 'string', 'max:50'],
             'rules.freeze' => ['required', 'boolean'],
+            'rules.auto_dissolve_minutes' => ['nullable', 'integer', 'min:1'],
             'fields' => ['array'],
             'fields.*.name' => ['required_with:fields', 'string', 'max:80'],
             'fields.*.type' => ['required_with:fields', 'in:text'],

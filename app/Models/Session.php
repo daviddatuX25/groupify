@@ -25,6 +25,7 @@ class Session extends Model
     {
         return [
             'config' => SessionConfigCast::class,
+            'dissolve_at' => 'datetime',
         ];
     }
 

@@ -18,7 +18,7 @@ services:
       APP_URL: http://localhost:8081
       APP_KEY: ${APP_KEY:-base64:5x0xZz1yPz3wQ7mF9kC2vN4bR6tY8uA1dE3gH5jK7L}
       DB_CONNECTION: sqlite
-      DB_DATABASE: /var/www/html/database/database.sqlite
+      DB_DATABASE: /var/www/html/database/data/database.sqlite
       QUEUE_CONNECTION: database
       CACHE_STORE: database
       SESSION_DRIVER: database
@@ -29,8 +29,10 @@ services:
       REVERB_HOST: 127.0.0.1
       REVERB_PORT: 8080
       REVERB_SCHEME: http
+      DB_BUSY_TIMEOUT: 30000
+      DB_JOURNAL_MODE: wal
     volumes:
-      - groupify-sqlite:/var/www/html/database
+      - groupify-sqlite:/var/www/html/database/data
       - groupify-storage:/var/www/html/storage
     restart: unless-stopped
 

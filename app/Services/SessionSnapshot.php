@@ -6,6 +6,7 @@ use App\Models\Group;
 use App\Models\Membership;
 use App\Models\Participant;
 use App\Models\Session;
+use Illuminate\Support\Carbon;
 
 /**
  * One server-computed snapshot of a session's live board (CAP-3).
@@ -38,6 +39,7 @@ class SessionSnapshot
         return [
             'code' => $session->code,
             'status' => $session->status,
+            'dissolve_at' => $session->dissolve_at !== null ? Carbon::parse($session->dissolve_at)->toIso8601String() : null,
             'config' => $session->config->toArray(),
             'presence' => Participant::query()->where('group_session_id', $session->id)->count(),
             'pool' => $pool->values(),

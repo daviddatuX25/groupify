@@ -34,6 +34,7 @@ class SessionConfig implements Arrayable, JsonSerializable
                 'allow_user_creation' => true,
                 'naming' => 'alpha', // alpha = Team Alpha/Bravo… | table = Table 1/2…
                 'freeze' => false,
+                'auto_dissolve_minutes' => null,
             ],
             'fields' => [],
             'perms' => [],
