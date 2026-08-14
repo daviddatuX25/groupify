@@ -35,6 +35,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [showBoard, setShowBoard] = useState(true);
     const [activity, setActivity] = useState<{ type: string; payload: Record<string, unknown>; at: string }[]>([]);
     const [timerMin, setTimerMin] = useState('');
+    const [guestListText, setGuestListText] = useState('');
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
     if (typeof window !== 'undefined' && session.admin_token) {
@@ -178,6 +179,37 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                                     onChange={(e) => setTimerMin(e.target.value)}
                                     className="w-36 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
                                 />
+                                <input
+                                    type="text"
+                                    placeholder="Guest list (comma-separated)"
+                                    value={guestListText}
+                                    onChange={(e) => setGuestListText(e.target.value)}
+                                    className="w-56 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const names = guestListText
+                                            .split(',')
+                                            .map((n) => n.trim())
+                                            .filter(Boolean);
+                                        fetch(`/admin/sessions/${session.id}/config`, {
+                                            method: 'PUT',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                Accept: 'application/json',
+                                                'X-Admin-Token': adminToken,
+                                                'X-XSRF-TOKEN': decodeURIComponent(
+                                                    document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                                ),
+                                            },
+                                            body: JSON.stringify({ rules: { guest_list: names } }),
+                                        }).then((r) => { if (r.ok) { refetch(); setGuestListText(''); } });
+                                    }}
+                                    className="rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+                                >
+                                    Set guest list
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => {

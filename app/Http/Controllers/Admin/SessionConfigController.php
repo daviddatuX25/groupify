@@ -67,6 +67,8 @@ class SessionConfigController
             'rules.naming' => ['required', 'string', 'max:50'],
             'rules.freeze' => ['required', 'boolean'],
             'rules.auto_dissolve_minutes' => ['nullable', 'integer', 'min:1'],
+            'rules.guest_list' => ['array'],
+            'rules.guest_list.*' => ['string', 'max:80'],
             'fields' => ['array'],
             'fields.*.name' => ['required_with:fields', 'string', 'max:80'],
             'fields.*.type' => ['required_with:fields', 'in:text'],

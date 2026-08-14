@@ -35,6 +35,7 @@ class SessionConfig implements Arrayable, JsonSerializable
                 'naming' => 'alpha', // alpha = Team Alpha/Bravo… | table = Table 1/2…
                 'freeze' => false,
                 'auto_dissolve_minutes' => null,
+                'guest_list' => [],
             ],
             'fields' => [],
             'perms' => [],
@@ -82,9 +83,13 @@ class SessionConfig implements Arrayable, JsonSerializable
         return $this->data['perms'] ?? [];
     }
 
-    /**
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
+    public function guestList(): array
+    {
+        return $this->data['rules']['guest_list'] ?? [];
+    }
+
+    /** @return array<int, string> */
     public function extensions(): array
     {
         return $this->data['extensions'] ?? [];

@@ -33,7 +33,7 @@ Phasing preserves the full vision (locked decision: cut scope, never the vision)
 - Device binding (FingerprintJS; convenience-grade)
 - Group quiz extension, custom roles
 - PWA shell
-- Gated entry / guest lists (invite-only, pre-allowed names — AhaSlides passcode / Zoom roster pattern)
+- ~~Gated entry / guest lists~~ — **SHIPPED (phase-2 story D, 2026-08-14)**
 - Anonymous mode (random names, host retains identity — Slido/Blooket pattern)
 - Async sessions (reopen for absentees, deadline joins — Quizizz/Wordwall pattern)
 - Avatar/visual identity (Blooket-style) — optional engagement layer

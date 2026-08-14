@@ -59,10 +59,28 @@ class JoinController
             throw ValidationException::withMessages(['pin' => 'Wrong PIN.']);
         }
 
+        $name = trim($data['name']);
+        $guestList = $session->config->guestList();
+        if ($guestList !== []) {
+            $allowed = array_map(fn ($n) => mb_strtolower(trim((string) $n)), $guestList);
+            if (! in_array(mb_strtolower($name), $allowed, true)) {
+                throw ValidationException::withMessages(['name' => 'That name is not on the guest list.']);
+            }
+
+            $claimed = Participant::query()
+                ->where('group_session_id', $session->id)
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                ->exists();
+
+            if ($claimed) {
+                throw ValidationException::withMessages(['name' => 'That name is already taken.']);
+            }
+        }
+
         // AD-7: one seat per (session, device token) — same token rejoins its seat.
         $participant = Participant::query()->firstOrCreate(
             ['group_session_id' => $session->id, 'token' => $data['device_token']],
-            ['name' => $data['name'], 'email' => $data['email'] ?? null],
+            ['name' => $name, 'email' => $data['email'] ?? null],
         );
 
         if ($participant->wasRecentlyCreated) {
