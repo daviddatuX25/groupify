@@ -57,10 +57,10 @@ development_status:
   3-1-admin-panel: review
   3-2-force-move: review
   3-3-dissolve-groups: review
-  3-4-freeze-unfreeze: ready-for-dev
-  3-5-csv-export: ready-for-dev
+  3-4-freeze-unfreeze: review
+  3-5-csv-export: review
   3-6-activity-feed: ready-for-dev
-  3-7-projection-hotkeys: ready-for-dev
+  3-7-projection-hotkeys: review
   epic-3-retrospective: optional
 
   # Epic 4 — Flexibility Systems

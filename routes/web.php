@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminActionsController;
+use App\Http\Controllers\Admin\AdminExportController;
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Controllers\Admin\SessionConfigController;
 use App\Http\Controllers\Admin\SessionStateController;
@@ -43,3 +44,5 @@ Route::post('/admin/sessions/{session}/members/{participant}/move', [AdminAction
     ->name('admin.members.move');
 Route::post('/admin/sessions/{session}/dissolve', [AdminActionsController::class, 'dissolve'])
     ->name('admin.dissolve');
+Route::get('/admin/sessions/{session}/export', [AdminExportController::class, 'csv'])
+    ->name('admin.export');

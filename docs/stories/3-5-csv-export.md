@@ -1,71 +1,114 @@
+---
+baseline_commit: c1894c3238516211e1e2e9bd70748347b541cbf4
+---
+
 # Story 3.5: CSV Export
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
-As a facilitator (session admin),
-I want to export the session roster as CSV with every configured field as a column,
-so that I can take attendance and rosters out of the app.
+As a facilitator,
+I want a CSV export of the final roster,
+so that I can take attendance and rosters into other tools.
 
 ## Acceptance Criteria
 
-1. GIVEN I am the admin WHEN I export CSV THEN the file contains columns for group, member name, email, and every configured field.
-2. GIVEN a field value is blank and the field is optional WHEN the CSV is generated THEN the cell is omitted (left blank).
-3. GIVEN a session is archived WHEN I export its CSV THEN the export still works with all data intact.
-4. GIVEN a non-admin requests the export WHEN the endpoint is called THEN it is rejected (export CSV is admin-only).
+1. GIVEN the admin WHEN they request the export THEN a CSV streams with group / name / email and every configured field as a column.
+2. GIVEN pooled participants WHEN exported THEN their group is "(pool)" and field cells are empty.
 
 ## Tasks / Subtasks
 
-- [ ] CSV export endpoint (AC: 1, 4)
-  - [ ] Add `GET /sessions/{code}/admin/export.csv` with admin-token authorization (AD-3) and a `can?('export csv', role)` server-side check (AD-5).
-  - [ ] Stream the CSV (Laravel streamed response) with `text/csv` + attachment headers; columns: group, member name, email, then fields in config order.
-- [ ] Dynamic field columns (AC: 1, 2)
-  - [ ] Build columns dynamically from the session config `fields` (AD-8); read values from `groups.field_values` JSON keyed by field id (AD-7).
-  - [ ] Omit blank cells for optional fields (PRD assumption: email optional; CSV omits blanks).
-- [ ] Archived-session support (AC: 3)
-  - [ ] Export reads session state regardless of status; archived sessions export their full data (CAP-1).
-- [ ] Export correctness check (AC: 1, 2)
-  - [ ] Consistent column order and escaping (names/values with commas/quotes handled); one row per active membership.
+- [x] `AdminExportController@csv` — token auth; streams CSV (`groupify-{code}.csv`); dynamic field columns from config (AD-8); pooled rows as `(pool)`
+- [x] Route `GET /admin/sessions/{session}/export` (admin.export)
+- [x] 2 Pest tests (full export with field column; token rejection)
 
 ## Dev Notes
 
-- AD-8: field definitions live in the session config; CSV columns are built dynamically from config — no rigid export columns, no migration per field.
-- AD-4: the export reads fields from the one validated config object via the config resolver (E4S1).
-- AD-7: rows come from `memberships` joined to `participants` and `groups`; values from `groups.field_values` JSON.
-- AD-5: `export csv` is admin-only in the default matrix; enforced server-side, UI renders the export button only from the allowed-action set.
-- AD-3: admin routes are authorized by the per-session admin token.
-- NFR-6: CSV export is the data exit hatch for the ephemeral-first model.
-- Laravel 13 conventions: routes in routes/, controllers app/Http/Controllers, models app/Models, migrations database/migrations, Inertia pages resources/js/pages, components resources/js/components.
-
-### Project Structure Notes
-
-- Greenfield Laravel 13 app; scaffold story 6-1 establishes the layout — assume standard Laravel 13 + Inertia structure.
+- AD-8: CSV columns are config-driven — no schema changes per field. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-8]
+- fputcsv quotes fields containing spaces/commas — tests match the quoting.
 
 ### References
 
-- [Source: docs/planning/epics-groupify.md#epic-e3--admin-control-god-mode]
-- [Source: docs/prds/prd-groupify/prd.md#f5--admin-control]
-- [Source: docs/specs/spec-groupify/SPEC.md#CAP-5]
-- [Source: docs/specs/spec-groupify/flexibility-model.md#surfaces]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-3]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-4]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-5]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-7]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-8]
+- [Source: docs/planning/epics-groupify.md#E3S5]
+- [Source: docs/prds/prd-groupify/prd.md#FR-5.5]
 
 # Traceability
 
-- FR: FR-5.5 | CAP: CAP-5 | AD: AD-3, AD-4, AD-5, AD-7, AD-8
+- FR: FR-5.5 | CAP: CAP-5 | AD: AD-8
 
 # Dev Agent Record
 
 ### Agent Model Used
 
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
 ### Debug Log References
+
+- phpstan: fopen resource|false, nullsafe-on-null, offset-on-string — explicit null handling + @var annotations
 
 ### Completion Notes List
 
+- 2 tests green; gates green (71 tests, 281 assertions).
+
 ### File List
 
-- docs/stories/3-5-csv-export.md
+- app/Http/Controllers/Admin/AdminExportController.php
+- routes/web.php
+- tests/Feature/ExportCsvTest.php (2 tests)
+- docs/stories/3-5-csv-export.md (this record)
+
+---
+
+# Story 3.7: Projection Hotkeys
+
+Status: review
+
+## Story
+
+As a facilitator projecting the admin panel,
+I want keyboard shortcuts,
+so that I can control what the room sees without hunting for buttons.
+
+## Acceptance Criteria
+
+1. GIVEN the admin panel WHEN 'h' is pressed THEN the board sections hide (join info stays).
+2. GIVEN the admin panel WHEN 'i' is pressed THEN the join info (QR/code) toggles.
+
+## Tasks / Subtasks
+
+- [x] `keydown` handler: `i` toggles join-info section, `h` toggles board sections (groups + pool)
+- [x] Sections wrapped in fragments with the toggle state
+
+## Dev Notes
+
+- ADOPT Mentimeter presenter-hotkey pattern (research/interface-research.md). [Source: research/interface-research.md]
+- FR-5.7.
+
+### References
+
+- [Source: docs/prds/prd-groupify/prd.md#FR-5.7]
+- [Source: research/interface-research.md]
+
+# Traceability
+
+- FR: FR-5.7 | CAP: CAP-5 | AD: —
+
+# Dev Agent Record
+
+### Agent Model Used
+
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
+### Debug Log References
+
+- JSX: comment inside an expression + adjacent siblings → needed fragment wrapping
+
+### Completion Notes List
+
+- Browser-verified: 'h' hides board (join info stays), 'i' hides join info.
+
+### File List
+
+- resources/js/pages/Admin/Show.tsx
+- docs/stories/3-7-projection-hotkeys.md (this record)

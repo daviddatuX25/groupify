@@ -29,6 +29,8 @@ const CHANNEL_EVENTS = ['SessionConfigUpdated', 'SessionStateUpdated', 'GroupCre
 export default function Show({ session }: { session: Board & { id: number; pin: string; admin_token?: string } }) {
     const [board, setBoard] = useState<Board | null>(null);
     const [ready, setReady] = useState(false);
+    const [showJoinInfo, setShowJoinInfo] = useState(true);
+    const [showBoard, setShowBoard] = useState(true);
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
     if (typeof window !== 'undefined' && session.admin_token) {
@@ -105,6 +107,16 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
         });
     };
 
+    // 3-7: projection hotkeys — i toggles join info, h hides the board (Mentimeter pattern)
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'i') setShowJoinInfo((v) => !v);
+            if (e.key === 'h') setShowBoard((v) => !v);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
     if (!ready) return null;
 
     const frozen = data.config.rules.freeze as boolean;
@@ -130,7 +142,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                     </div>
                 </header>
 
-                {/* Bento: QR + stats + controls */}
+                {showJoinInfo && (
                 <section className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-12">
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-900 p-5 md:col-span-3">
                         <canvas className="h-36 w-36 rounded-lg bg-white p-2" />
@@ -176,8 +188,11 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                         </div>
                     </div>
                 </section>
+                )}
 
                 {/* Live groups */}
+                {showBoard && (
+                <>
                 <h2 className="mt-8 text-sm font-bold uppercase tracking-wide text-slate-400">Live groups</h2>
                 <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {data.groups.map((g) => (
@@ -271,6 +286,8 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                     ))}
                     {data.pool.length === 0 && <p className="text-sm text-slate-500">Everyone is grouped.</p>}
                 </div>
+                </>
+                )}
             </div>
         </main>
     );
