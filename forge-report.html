@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Groupify — Forge Report</title>
+<style>
+  :root { color-scheme: light; --ink:#1a1d21; --mut:#6b7280; --line:#e5e7eb; --accent:#16a34a; }
+  body { font: 15px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:var(--ink); max-width:720px; margin:0 auto; padding:48px 24px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  .mut { color:var(--mut); }
+  .stamp { display:flex; align-items:center; gap:20px; margin:24px 0; }
+  .seal { width:96px; height:96px; flex:0 0 auto; }
+  h2 { font-size:17px; margin:32px 0 8px; border-top:1px solid var(--line); padding-top:20px; }
+  ul { margin:8px 0 0; padding-left:20px; }
+  li { margin:4px 0; }
+  .tag { display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:999px; margin-right:6px; }
+  .lock { background:#dcfce7; color:#15803d; }
+  .rej { background:#fee2e2; color:#b91c1c; }
+  .weak { background:#fef3c7; color:#b45309; }
+  .personas { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
+  .card { border:1px solid var(--line); border-radius:10px; padding:10px 14px; font-size:13px; width:200px; }
+  .card b { display:block; margin-bottom:2px; }
+  footer { margin-top:40px; color:var(--mut); font-size:13px; }
+</style>
+</head>
+<body>
+  <h1>Groupify — Forge Report</h1>
+  <p class="mut">Idea pressure-tested via persona interrogation · 2026-08-14</p>
+
+  <div class="stamp">
+    <svg class="seal" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs><path id="circ" d="M50,50 m-38,0 a38,38 0 1,1 76,0 a38,38 0 1,1 -76,0"/></defs>
+      <circle cx="50" cy="50" r="48" fill="#f0fdf4" stroke="#16a34a" stroke-width="3"/>
+      <circle cx="50" cy="50" r="44" fill="none" stroke="#16a34a" stroke-width="1" stroke-dasharray="3 3"/>
+      <text font-size="9.5" font-weight="700" fill="#15803d" letter-spacing="2">
+        <textPath href="#circ">HARDENED&nbsp;&nbsp;•&nbsp;&nbsp;NIGHT-ONE BUILD&nbsp;&nbsp;•&nbsp;&nbsp;</textPath>
+      </text>
+      <text x="50" y="53" text-anchor="middle" font-size="10" font-weight="700" fill="#16a34a">✓</text>
+      <text x="50" y="65" text-anchor="middle" font-size="8" fill="#15803d">GROUPIFY</text>
+    </svg>
+    <div>
+      <p style="margin:0"><b>Outcome: HARDENED</b></p>
+      <p class="mut" style="margin:2px 0 0">Direction is specific enough to hand to an agent. Distilled contract: <code>forged-idea.md</code>.</p>
+    </div>
+  </div>
+
+  <h2>Locked decisions</h2>
+  <ul>
+    <li><span class="tag lock">LOCK</span> Wedge: BYOD facilitated events — live grid board + one-tap join/leave + admin override is the product.</li>
+    <li><span class="tag lock">LOCK</span> Night-one scope: session → join by code/QR (+PIN) → pool → grid → create/join/leave → admin move/dissolve/freeze/CSV → offline banner.</li>
+    <li><span class="tag lock">LOCK</span> No accounts. Display name + per-device token. Fingerprinting deferred (weak by design anyway).</li>
+    <li><span class="tag lock">LOCK</span> Stack: Laravel 12 + Inertia + React, Reverb (over Pusher), shadcn/ui + lucide, SQLite, Docker dev, Dokploy at <code>groupify.dxtechph.online</code>.</li>
+    <li><span class="tag lock">LOCK</span> First real user: classmates; demo-grade but must actually work.</li>
+  </ul>
+
+  <h2>Rejected</h2>
+  <ul>
+    <li><span class="tag rej">REJECT</span> Chat tiers on night one — biggest scope item; formation is the product.</li>
+    <li><span class="tag rej">REJECT</span> Postgres + Redis — SQLite suffices at this scale; Postgres is the later scale-out.</li>
+    <li><span class="tag rej">REJECT</span> Pusher — free tier caps ~100 concurrent connections; Reverb is free, self-hosted, no caps.</li>
+    <li><span class="tag rej">REJECT</span> "Blue ocean" positioning — feature-count marketing, not a moat. Live-formation loop is the moat.</li>
+  </ul>
+
+  <h2>Weak points that survived scrutiny</h2>
+  <ul>
+    <li><span class="tag weak">WEAK</span> Seat-binding ("1 device = 1 seat") is unenforceable on the open web — treat as convenience, not security.</li>
+    <li><span class="tag weak">WEAK</span> Home-server reliability — mitigated by explicit "server offline" UX, but uptime remains the biggest product risk.</li>
+    <li><span class="tag weak">WEAK</span> Offline mode ("scan QR, keep working without the server") is the banger quirk but needs its own design pass — PWA shell + sync queue + local/mesh host mode are three different architectures.</li>
+  </ul>
+
+  <h2>Personas that pressure-tested</h2>
+  <div class="personas">
+    <div class="card"><b>Mara · facilitator</b>Formation must feel live and fair; chat is garnish on day one.</div>
+    <div class="card"><b>Vince · events operator</b>One screen showing who's grouped with whom, right now, override without shouting — that's the meal.</div>
+    <div class="card"><b>Marta · builder</b>One night + self-hosted = option 1 is the only buildable core that feels like a real product.</div>
+  </div>
+
+  <footer>Feed <code>forged-idea.md</code> into bmad-spec / bmad-prd / bmad-quick-dev for the build. Session ran in-conversation (no BMad workspace tooling in this repo).</footer>
+</body>
+</html>

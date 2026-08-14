@@ -1,0 +1,96 @@
+# Sprint Status — Groupify
+# generated: 2026-08-14
+# project: Groupify
+# project_key: GROUPIFY
+# tracking_system: file-system
+# story_location: docs/stories
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+generated: 2026-08-14
+last_updated: 2026-08-14
+project: Groupify
+project_key: GROUPIFY
+tracking_system: file-system
+story_location: "docs/stories"
+
+development_status:
+  # Epic 1 — Session Foundation
+  epic-1: backlog
+  1-1-session-create: ready-for-dev
+  1-2-join-code-pin: ready-for-dev
+  1-3-qr-join: ready-for-dev
+  1-4-auto-rejoin: ready-for-dev
+  1-5-session-states: ready-for-dev
+  1-6-join-instruction-bar: ready-for-dev
+  1-7-auto-purge: ready-for-dev
+  epic-1-retrospective: optional
+
+  # Epic 2 — Live Board & Groups
+  epic-2: backlog
+  2-1-unassigned-pool: ready-for-dev
+  2-2-grid-board: ready-for-dev
+  2-3-create-group: ready-for-dev
+  2-4-join-leave-group: ready-for-dev
+  2-5-live-flashes: ready-for-dev
+  2-6-snapshot-resync: ready-for-dev
+  epic-2-retrospective: optional
+
+  # Epic 3 — Admin Control
+  epic-3: backlog
+  3-1-admin-panel: ready-for-dev
+  3-2-force-move: ready-for-dev
+  3-3-dissolve-groups: ready-for-dev
+  3-4-freeze-unfreeze: ready-for-dev
+  3-5-csv-export: ready-for-dev
+  3-6-activity-feed: ready-for-dev
+  3-7-projection-hotkeys: ready-for-dev
+  epic-3-retrospective: optional
+
+  # Epic 4 — Flexibility Systems
+  epic-4: backlog
+  4-1-session-config: ready-for-dev
+  4-2-fields-system: ready-for-dev
+  4-3-permission-engine: ready-for-dev
+  4-4-delegation-toggles: ready-for-dev
+  4-5-extensions-framework: ready-for-dev
+  epic-4-retrospective: optional
+
+  # Epic 5 — Reliability & UX Shell
+  epic-5: backlog
+  5-1-server-status: ready-for-dev
+  5-2-mobile-shell: ready-for-dev
+  5-3-coming-next: ready-for-dev
+  5-4-accessibility: ready-for-dev
+  epic-5-retrospective: optional
+
+  # Epic 6 — Deploy & Ops
+  epic-6: backlog
+  6-1-docker-dev: ready-for-dev
+  6-2-reverb-queue: ready-for-dev
+  6-3-dokploy-deploy: ready-for-dev
+  6-4-e2e-smoke: ready-for-dev
+  epic-6-retrospective: optional
+
+# Epic 7+ (preserved vision: chat, approvals, proxy, auto-dissolve, match-me,
+# device binding, quiz ext, guest lists, anonymous mode, async sessions,
+# templates, activity export, custom roles, PWA, offline mode) is roadmap-owned,
+# NOT in this sprint — see docs/specs/spec-groupify/roadmap.md
+
+action_items: []
