@@ -46,8 +46,8 @@ development_status:
   epic-2: backlog
   2-1-unassigned-pool: review
   2-2-grid-board: review
-  2-3-create-group: ready-for-dev
-  2-4-join-leave-group: ready-for-dev
+  2-3-create-group: review
+  2-4-join-leave-group: review
   2-5-live-flashes: ready-for-dev
   2-6-snapshot-resync: ready-for-dev
   epic-2-retrospective: optional

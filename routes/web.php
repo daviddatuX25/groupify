@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Controllers\Admin\SessionConfigController;
 use App\Http\Controllers\Admin\SessionStateController;
+use App\Http\Controllers\GroupController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SessionPageController;
@@ -19,6 +20,11 @@ Route::get('/join/{session:code}/seat', [JoinController::class, 'seat'])->name('
 Route::get('/join/{session:code}', [JoinController::class, 'show'])->name('join.show');
 Route::post('/join/{session:code}', [JoinController::class, 'store'])->name('join.store');
 Route::get('/s/{session:code}', [SessionPageController::class, 'show'])->name('session.show');
+
+// Participant group mutations (FR-4.1 … FR-4.3): device-token identity, transactional checks (AD-7)
+Route::post('/s/{session:code}/groups', [GroupController::class, 'store'])->name('groups.store');
+Route::post('/s/{session:code}/groups/{group}/join', [GroupController::class, 'join'])->name('groups.join');
+Route::post('/s/{session:code}/groups/{group}/leave', [GroupController::class, 'leave'])->name('groups.leave');
 
 // Admin-only (AD-3: token in query or X-Admin-Token header)
 Route::get('/admin/sessions/{session}', [AdminPanelController::class, 'show'])->name('admin.sessions.show');
