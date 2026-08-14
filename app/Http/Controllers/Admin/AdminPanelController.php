@@ -19,7 +19,7 @@ class AdminPanelController
 
         abort_unless(hash_equals($session->admin_token, (string) $token), 404);
 
-        $board = $snapshot->build($session, null);
+        $board = $snapshot->build($session, null, true);
 
         return Inertia::render('Admin/Show', [
             'session' => [

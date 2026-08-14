@@ -51,6 +51,59 @@ class SessionConfig implements Arrayable, JsonSerializable
     /**
      * @param  array<string, mixed>  $data
      */
+    /**
+     * Merge with replace semantics: associative arrays merge per key, list
+     * arrays are replaced wholesale (so guest-list/fields/quiz edits can
+     * remove entries — array_replace_recursive merges numeric lists instead).
+     *
+     * @param  array<string, mixed>  $base
+     * @param  array<string, mixed>  $overlay
+     * @return array<string, mixed>
+     */
+    /**
+     * What unauthenticated board fetchers may see (CAP-9, AD-4): the rules the
+     * participant UI reads, the custom fields, and nothing else. Never exposes
+     * perms/roles/quiz/guest-list to the public snapshot.
+     *
+     * @return array<string, mixed>
+     */
+    public function publicView(): array
+    {
+        $rules = $this->data['rules'] ?? [];
+        unset($rules['guest_list']);
+
+        return [
+            'rules' => $rules,
+            'fields' => $this->data['fields'] ?? [],
+        ];
+    }
+
+    /**
+     * Merge with replace semantics: associative arrays merge per key, list
+     * arrays are replaced wholesale (so guest-list/fields/quiz edits can
+     * remove entries — array_replace_recursive merges numeric lists instead).
+     *
+     * @param  array<string, mixed>  $base
+     * @param  array<string, mixed>  $overlay
+     * @return array<string, mixed>
+     */
+    public static function deepMerge(array $base, array $overlay): array
+    {
+        foreach ($overlay as $key => $value) {
+            if (is_array($value) && isset($base[$key]) && is_array($base[$key])
+                && ! array_is_list($value) && ! array_is_list($base[$key])) {
+                $base[$key] = self::deepMerge($base[$key], $value);
+            } else {
+                $base[$key] = $value;
+            }
+        }
+
+        return $base;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public static function fromArray(array $data): self
     {
         return new self(array_replace_recursive(self::defaults(), $data));

@@ -72,7 +72,7 @@ class GroupController
             return $group;
         });
 
-        broadcast(new GroupCreated($group))->toOthers();
+        broadcast(new GroupCreated($session, $group))->toOthers();
         $recorder->record($session, 'group_created', ['group_id' => $group->id, 'name' => $group->name]);
 
         return response()->json(['ok' => true, 'group_id' => $group->id, 'name' => $group->name]);
@@ -230,6 +230,16 @@ class GroupController
             ->first();
 
         abort_unless($membership !== null, 404);
+
+        // CAP-4/CAP-6: never overfill a group or double-seat a participant.
+        if (Membership::query()->where('participant_id', $participant->id)->where('status', 'active')->exists()) {
+            throw ValidationException::withMessages(['participant' => 'This participant is already in a group.']);
+        }
+
+        $capacity = (int) $group->capacity;
+        if ($capacity > 0 && Membership::query()->where('group_id', $group->id)->where('status', 'active')->count() >= $capacity) {
+            throw ValidationException::withMessages(['group' => 'This group is full.']);
+        }
 
         $membership->update(['status' => 'active', 'role' => 'member']);
 

@@ -3,8 +3,8 @@
 namespace App\Events;
 
 use App\Models\Session;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -18,11 +18,22 @@ class QuizStateUpdated implements ShouldBroadcast
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel("session.{$this->session->code}")];
+        return [new Channel("session.{$this->session->code}")];
     }
 
     public function broadcastAs(): string
     {
         return 'quiz.updated';
+    }
+
+    /**
+     * Whitelist the payload — never serialize the Session model (admin token,
+     * PIN, config live in it).
+     *
+     * @return array<string, mixed>
+     */
+    public function broadcastWith(): array
+    {
+        return $this->state;
     }
 }

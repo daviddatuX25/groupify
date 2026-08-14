@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Models\Group;
+use App\Models\Session;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -14,11 +15,11 @@ class GroupCreated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public Group $group) {}
+    public function __construct(public Session $session, public Group $group) {}
 
     public function broadcastOn(): Channel
     {
-        return new Channel('session.'.$this->group->group_session_id);
+        return new Channel('session.'.$this->session->code);
     }
 
     /**

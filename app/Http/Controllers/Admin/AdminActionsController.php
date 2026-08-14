@@ -96,7 +96,12 @@ class AdminActionsController
 
             $count = $query->count();
             $query->delete();
-            Group::query()->where('group_session_id', $session->id)->update(['leader_id' => null]);
+
+            $affectedGroups = Group::query()->where('group_session_id', $session->id);
+            if ($groupId !== null) {
+                $affectedGroups->where('id', $groupId);
+            }
+            $affectedGroups->update(['leader_id' => null]);
 
             return $count;
         });

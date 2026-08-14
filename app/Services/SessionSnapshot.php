@@ -19,7 +19,7 @@ class SessionSnapshot
     /**
      * @return array<string, mixed>
      */
-    public function build(Session $session, ?Participant $me): array
+    public function build(Session $session, ?Participant $me, bool $admin = false): array
     {
         $groups = $session->groups()
             ->withCount(['memberships as member_count' => fn ($q) => $q->where('status', 'active')])
@@ -50,7 +50,9 @@ class SessionSnapshot
                 'status' => $run->status,
                 'current_index' => $run->current_index,
                 'total' => count($questions),
-                'question' => $questions[$run->current_index] ?? null,
+                'question' => $admin
+                    ? ($questions[$run->current_index] ?? null)
+                    : array_diff_key($questions[$run->current_index] ?? [], ['answer' => true]),
                 'my_answer' => $me === null ? null : (function () use ($me, $answers, $run) {
                     $gid = Membership::query()
                         ->where('participant_id', $me->id)
@@ -84,7 +86,7 @@ class SessionSnapshot
             'code' => $session->code,
             'status' => $session->status,
             'dissolve_at' => $session->dissolve_at !== null ? Carbon::parse($session->dissolve_at)->toIso8601String() : null,
-            'config' => $session->config->toArray(),
+            'config' => $admin ? $session->config->toArray() : $session->config->publicView(),
             'presence' => Participant::query()->where('group_session_id', $session->id)->count(),
             'pool' => $pool->map(fn ($p) => [
                 'id' => $p->id,
@@ -103,12 +105,12 @@ class SessionSnapshot
                     ->with('participant')
                     ->where('status', 'active')
                     ->get()
-                    ->map(function (Membership $m) use ($anonymous): array {
+                    ->map(function (Membership $m) use ($anonymous, $admin): array {
                         /** @var array{id: int, name: string, real_name: string|null, role: string} $member */
                         $member = [
                             'id' => $m->participant_id,
                             'name' => $m->participant->display_name ?? $m->participant->name,
-                            'real_name' => $anonymous ? $m->participant->name : null,
+                            'real_name' => $anonymous && $admin ? $m->participant->name : null,
                             'role' => $m->role,
                         ];
 
@@ -120,10 +122,13 @@ class SessionSnapshot
                     ->with('participant')
                     ->where('status', 'pending')
                     ->get()
-                    ->map(fn (Membership $m) => [
-                        'id' => $m->participant_id,
-                        'name' => $m->participant->name,
-                    ])
+                    ->map(function (Membership $m) use ($admin) {
+                        return [
+                            'id' => $m->participant_id,
+                            'name' => $m->participant->display_name ?? $m->participant->name,
+                            'real_name' => $admin ? $m->participant->name : null,
+                        ];
+                    })
                     ->values()
                     ->all(),
             ])->values(),

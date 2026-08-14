@@ -45,7 +45,7 @@ it('shows the display name on the board but the real name to the admin', functio
     $this->get(route('session.show', $this->session), ['X-Device-Token' => $me->token])
         ->assertInertia(fn ($page) => $page
             ->where('session.groups.0.members.0.name', 'Swift Fox')
-            ->where('session.groups.0.members.0.real_name', 'Maya')
+            ->where('session.groups.0.members.0.real_name', null)
             ->where('session.me.name', 'Swift Fox'));
 
     $this->getJson(route('board.show', $this->session), ['X-Admin-Token' => $this->session->admin_token])

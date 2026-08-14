@@ -10,6 +10,7 @@ use App\Models\QuizAnswer;
 use App\Models\QuizRun;
 use App\Models\Session;
 use App\Services\PermissionService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -103,6 +104,7 @@ class QuizController extends Controller
             ->first();
 
         abort_unless($me !== null && $group->leader_id === $me->id, 404);
+        abort_unless($session->status === 'live', 404);
         abort_unless(app(PermissionService::class)->can('answer_quiz', 'leader', $session->config), 404);
 
         $run = QuizRun::query()
@@ -122,6 +124,11 @@ class QuizController extends Controller
 
         abort_unless($index === (int) $run->current_index && isset($questions[$index]), 404);
 
+        $answerIndex = (int) $input['answer_index'];
+        $question = $questions[$index];
+
+        abort_unless($answerIndex < count($question['options']), 422);
+
         $already = QuizAnswer::query()
             ->where('group_id', $group->id)
             ->where('question_index', $index)
@@ -131,19 +138,21 @@ class QuizController extends Controller
             throw ValidationException::withMessages(['answer_index' => 'This group already answered.']);
         }
 
-        $answerIndex = (int) $input['answer_index'];
-        $question = $questions[$index];
         $correct = $answerIndex === (int) $question['answer'];
         $points = $correct ? (int) $question['points'] : 0;
 
-        QuizAnswer::query()->create([
-            'group_session_id' => $session->id,
-            'group_id' => $group->id,
-            'participant_id' => $me->id,
-            'question_index' => $index,
-            'answer_index' => $answerIndex,
-            'points' => $points,
-        ]);
+        try {
+            QuizAnswer::query()->create([
+                'group_session_id' => $session->id,
+                'group_id' => $group->id,
+                'participant_id' => $me->id,
+                'question_index' => $index,
+                'answer_index' => $answerIndex,
+                'points' => $points,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['answer_index' => 'This group already answered.']);
+        }
 
         // Auto-advance when every active group has answered this question.
         $activeGroups = Group::query()

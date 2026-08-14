@@ -20,7 +20,7 @@ class SessionConfigController
     {
         $this->authorizeAdmin($session, $request);
 
-        $merged = array_replace_recursive(
+        $merged = SessionConfig::deepMerge(
             $session->config->toArray(),
             $request->only(['rules', 'fields', 'perms', 'extensions', 'roles', 'quiz'])
         );
@@ -35,7 +35,7 @@ class SessionConfigController
         }
 
         // validate() drops unruled keys — merge back so future settings survive (AC 4).
-        $data = array_replace_recursive($merged, $validated);
+        $data = SessionConfig::deepMerge($merged, $validated);
 
         $session->update(['config' => $data]);
 

@@ -54,19 +54,29 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const adminToken =
         typeof window === 'undefined' ? '' : (window.localStorage.getItem('groupify.admin_token') ?? '');
 
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.location.search.includes('token=')) {
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, []);
+
     const data = board ?? session;
+
+    const [actionError, setActionError] = useState<string | null>(null);
 
     const refetch = () => {
         fetch(`/api/sessions/${data.code}/board`, { headers: { 'X-Admin-Token': adminToken } })
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => {
                 if (json) setBoard(json as Board);
-            });
+            })
+            .catch(() => setActionError('Board sync failed — reconnecting…'));
         fetch(`/admin/sessions/${session.id}/activity`, { headers: { 'X-Admin-Token': adminToken } })
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => {
                 if (json) setActivity(json.events);
-            });
+            })
+            .catch(() => {});
         fetch(`/admin/sessions/${session.id}/messages/pending`, { headers: { 'X-Admin-Token': adminToken } })
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => { if (json) setModQueue(json.messages); })
@@ -75,19 +85,27 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => {
                 if (json) setTemplates(json.templates);
-            });
+            })
+            .catch(() => {});
     };
 
-    // Persist token (AD-3) + live subscription (AD-6) + QR
+    // QR drawn on mount + whenever the canvas (re)mounts (F3: toggling join
+    // info destroyed the canvas and the effect never re-ran).
+    const qrRef = (node: HTMLCanvasElement | null) => {
+        if (node && data.code) {
+            void QRCode.toCanvas(node, `${window.location.origin}/join/${data.code}`, {
+                width: 160,
+                margin: 1,
+                color: { dark: '#0e1511', light: '#ffffff' },
+            });
+        }
+    };
+
+    // Persist token (AD-3) + live subscription (AD-6)
     useEffect(() => {
         try {
             if (typeof window === 'undefined') return;
             window.localStorage.setItem('groupify.admin_token', adminToken);
-            const url = `${window.location.origin}/join/${data.code}`;
-            const canvas = document.querySelector('canvas');
-            if (canvas) {
-                void QRCode.toCanvas(canvas, url, { width: 160, margin: 1, color: { dark: '#0e1511', light: '#ffffff' } });
-            }
             const channel = echo().channel(`session.${data.code}`);
             CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));
             setReady(true);
@@ -137,14 +155,26 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                 ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : {}),
             },
             body: JSON.stringify({ action }),
-        }).then((r) => {
-            if (r.ok) refetch();
-        });
+        })
+            .then((r) => {
+                if (r.ok) {
+                    setActionError(null);
+                    refetch();
+                    return;
+                }
+                return r
+                    .json()
+                    .then((j) => setActionError(j.message ?? `Request failed (${r.status}).`))
+                    .catch(() => setActionError(`Request failed (${r.status}).`));
+            })
+            .catch(() => setActionError('Network error — try again.'));
     };
 
     // 3-7: projection hotkeys — i toggles join info, h hides the board (Mentimeter pattern)
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
+            const t = e.target as HTMLElement | null;
+            if (t && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable)) return;
             if (e.key === 'i') setShowJoinInfo((v) => !v);
             if (e.key === 'h') setShowBoard((v) => !v);
         };
@@ -160,6 +190,11 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     return (
         <main className="min-h-screen bg-slate-950 text-slate-100">
             <div className="mx-auto w-full max-w-7xl px-6 py-8">
+                {actionError && (
+                    <div className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-2 text-sm text-rose-300">
+                        {actionError}
+                    </div>
+                )}
                 <ServerStatus />
                 <header className="flex flex-wrap items-center justify-between gap-4">
                     <div>
@@ -184,7 +219,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                 {showJoinInfo && (
                 <section className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-12">
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-900 p-5 md:col-span-3">
-                        <canvas className="h-36 w-36 rounded-lg bg-white p-2" />
+                        <canvas ref={qrRef} className="h-36 w-36 rounded-lg bg-white p-2" />
                         <p className="mt-3 text-xs uppercase tracking-widest text-slate-400">Scan to join</p>
                         <p className="mt-1 font-mono text-lg font-bold tracking-widest text-cyan-400">{data.code}</p>
                     </div>

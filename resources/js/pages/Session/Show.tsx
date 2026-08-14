@@ -44,7 +44,9 @@ export default function Show({ session }: { session: SessionProps }) {
     const [actionError, setActionError] = useState<string | null>(null);
     const [messages, setMessages] = useState<{ id: number; scope: string; author: string; body: string; at: string }[]>([]);
     const [chatOpen, setChatOpen] = useState(false);
-    const [chatDraft, setChatDraft] = useState('');
+    const [globalDraft, setGlobalDraft] = useState('');
+    const [groupDraft, setGroupDraft] = useState('');
+    const [quizPick, setQuizPick] = useState<number | null>(null);
     const [nowTick, setNowTick] = useState(Date.now());
     const prevStatus = useRef<string | null>(null);
 
@@ -53,12 +55,16 @@ export default function Show({ session }: { session: SessionProps }) {
 
     const data = board ?? session;
 
+    const refetchRef = useRef<() => void>(() => {});
+    const seqRef = useRef(0);
+
     const refetch = () => {
         if (data.config.rules.chat_enabled) {
             fetch(`/s/${data.code}/messages`, { headers: { 'X-Device-Token': deviceToken } })
                 .then((r) => (r.ok ? r.json() : null))
                 .then((json) => { if (json) setMessages(json.messages); });
         }
+        const seq = ++seqRef.current;
         fetch(`/api/sessions/${data.code}/board`, { headers: { 'X-Device-Token': deviceToken } })
             .then((r) => {
                 if (r.status === 404) {
@@ -68,16 +74,17 @@ export default function Show({ session }: { session: SessionProps }) {
                 return r.ok ? r.json() : null;
             })
             .then((json) => {
-                if (json) setBoard(json as SessionProps);
+                if (json && seq === seqRef.current) setBoard(json as SessionProps);
             });
     };
+    refetchRef.current = refetch;
 
     // 2-5: live events → refetch the snapshot; membership events flash the card (AD-6)
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const channel = echo().channel(`session.${data.code}`);
-        CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));
-        channel.listen('MessageCreated', refetch);
+        CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, () => refetchRef.current()));
+        channel.listen('MessageCreated', () => refetchRef.current());
         channel.listen('MembershipChanged', (e: { group_id: number; action: string }) => {
             if (e.action === 'joined' || e.action === 'left') {
                 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -86,7 +93,7 @@ export default function Show({ session }: { session: SessionProps }) {
                     window.setTimeout(() => setFlash(null), 1200);
                 }
             }
-            refetch();
+            refetchRef.current();
         });
         return () => {
             CHANNEL_EVENTS.forEach((ev) => channel.stopListening(ev));
@@ -95,6 +102,13 @@ export default function Show({ session }: { session: SessionProps }) {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.code, deviceToken]);
+
+    // F6: never leave the device token in the address bar (history/referrer leak)
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.location.search.includes('device_token')) {
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, []);
 
     // Auto-dissolve countdown ticker
     useEffect(() => {
@@ -142,6 +156,16 @@ export default function Show({ session }: { session: SessionProps }) {
             .catch(() => setActionError('Network error — try again.'));
     };
 
+    const groups = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        return data.groups.filter((g) => {
+            if (openOnly && g.open_slots <= 0) return false;
+            if (!q) return true;
+            const topic = Object.values(g.field_values).join(' ').toLowerCase();
+            return g.name.toLowerCase().includes(q) || topic.includes(q);
+        });
+    }, [data.groups, query, openOnly]);
+
     if (gone) {
         return (
             <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100">
@@ -154,16 +178,6 @@ export default function Show({ session }: { session: SessionProps }) {
             </main>
         );
     }
-
-    const groups = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        return data.groups.filter((g) => {
-            if (openOnly && g.open_slots <= 0) return false;
-            if (!q) return true;
-            const topic = Object.values(g.field_values).join(' ').toLowerCase();
-            return g.name.toLowerCase().includes(q) || topic.includes(q);
-        });
-    }, [data.groups, query, openOnly]);
 
     const fieldNames = data.groups[0] ? Object.keys(data.groups[0].field_values) : [];
     const canMutate = data.status === 'live' && !(data.config.rules.freeze as boolean);
@@ -531,12 +545,12 @@ export default function Show({ session }: { session: SessionProps }) {
                                 <input
                                     type="text"
                                     placeholder="Post to the room…"
-                                    value={chatDraft}
-                                    onChange={(e) => setChatDraft(e.target.value)}
+                                    value={globalDraft}
+                                    onChange={(e) => setGlobalDraft(e.target.value)}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && chatDraft.trim()) {
-                                            const body = chatDraft;
-                                            setChatDraft('');
+                                        if (e.key === 'Enter' && globalDraft.trim()) {
+                                            const body = globalDraft;
+                                            setGlobalDraft('');
                                             void fetch(`/s/${data.code}/messages`, {
                                                 method: 'POST',
                                                 headers: {
@@ -559,12 +573,12 @@ export default function Show({ session }: { session: SessionProps }) {
                                     <input
                                         type="text"
                                         placeholder="Message your group…"
-                                        value={chatDraft}
-                                        onChange={(e) => setChatDraft(e.target.value)}
+                                        value={groupDraft}
+                                        onChange={(e) => setGroupDraft(e.target.value)}
                                         onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && chatDraft.trim()) {
-                                                const body = chatDraft;
-                                                setChatDraft('');
+                                            if (e.key === 'Enter' && groupDraft.trim()) {
+                                                const body = groupDraft;
+                                                setGroupDraft('');
                                                 void fetch(`/s/${data.code}/messages`, {
                                                     method: 'POST',
                                                     headers: {

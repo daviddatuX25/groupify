@@ -27,7 +27,7 @@ class BoardController
             ->first();
 
         return response()->json([
-            ...$snapshot->build($session, $me),
+            ...$snapshot->build($session, $me, $isAdmin),
             'is_admin' => $isAdmin,
         ]);
     }

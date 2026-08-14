@@ -48,7 +48,14 @@ class AdminExportController
                 throw new \RuntimeException('Could not open the output stream.');
             }
 
-            fputcsv($out, ['group', 'name', ...($anonymous ? ['registered name'] : []), 'email', ...$fields->all()]);
+            // CSV-injection guard: cells that look like spreadsheet formulas
+            // (=, +, -, @) get a leading apostrophe so Excel/Sheets keep them
+            // as text instead of evaluating them.
+            $cell = fn (string $value): string => $value === ''
+                ? ''
+                : (preg_match('/^[=+@\-]/', $value) ? "'".$value : $value);
+
+            fputcsv($out, array_map($cell, ['group', 'name', ...($anonymous ? ['registered name'] : []), 'email', ...$fields->all()]));
 
             foreach ($participants as $p) {
                 $groupId = $groupByParticipant->get($p->id);
@@ -66,7 +73,7 @@ class AdminExportController
                 foreach ($fields as $field) {
                     $row[] = $values[$field] ?? '';
                 }
-                fputcsv($out, $row);
+                fputcsv($out, array_map($cell, $row));
             }
 
             fclose($out);
