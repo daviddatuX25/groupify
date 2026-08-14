@@ -1,0 +1,15 @@
+name: groupify-edge
+
+services:
+  # Simulates the Dokploy/Caddy front: TLS termination + WS upgrade passthrough
+  # in front of the published app port. Self-signed (Caddy internal CA) —
+  # Playwright runs with ignoreHTTPSErrors.
+  caddy:
+    image: caddy:2
+    container_name: groupify-edge-caddy
+    ports:
+      - "9443:9443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: caddy reverse-proxy --from https://localhost:9443 --to host.docker.internal:8081
+    restart: unless-stopped
