@@ -10,6 +10,7 @@ use App\Models\QuizAnswer;
 use App\Models\QuizRun;
 use App\Models\Session;
 use App\Services\PermissionService;
+use App\Support\SessionConfig;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,8 @@ class QuizController extends Controller
     use AuthorizesAdminToken;
 
     /** @return array<string, mixed> */
-    private function quizState(Session $session, QuizRun $run): array
+    /** @return array<string, mixed> */
+    public function quizState(Session $session, QuizRun $run): array
     {
         $questions = $session->config->quiz();
         $answers = QuizAnswer::query()
@@ -47,7 +49,9 @@ class QuizController extends Controller
             'status' => $run->status,
             'current_index' => $run->current_index,
             'total' => count($questions),
-            'question' => $questions[$run->current_index] ?? null,
+            // NEVER ship the correct answer on the public WS channel —
+            // participants subscribe to session.{code} and would read it.
+            'question' => array_diff_key($questions[$run->current_index] ?? [], ['answer' => true]),
             'leaderboard' => $leaderboard,
         ];
     }
@@ -66,7 +70,7 @@ class QuizController extends Controller
             'questions.*.points' => ['required', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $session->update(['config' => array_replace_recursive($session->config->toArray(), [
+        $session->update(['config' => SessionConfig::deepMerge($session->config->toArray(), [
             'quiz' => ['questions' => $data['questions']],
         ])]);
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\QuizController;
 use App\Models\Group;
 use App\Models\Participant;
 use App\Models\QuizRun;
@@ -172,4 +173,22 @@ it('exposes the quiz state and leaderboard in the snapshot', function () {
 it('requires an admin token for quiz administration', function () {
     $this->postJson(route('admin.quiz.start', $this->session))->assertNotFound();
     $this->putJson(route('admin.quiz.save', $this->session), ['questions' => $this->questions])->assertNotFound();
+});
+
+it('never ships the correct answer in the quiz.updated broadcast payload', function () {
+    startQuiz($this->session, $this->questions);
+
+    $run = QuizRun::query()->where('group_session_id', $this->session->id)->latest('id')->first();
+
+    $state = app(QuizController::class)->quizState($this->session, $run);
+
+    expect($state['question'])->not->toHaveKey('answer')
+        ->and($state['question']['q'])->toBe('Capital of France?')
+        ->and($state['question']['options'])->toHaveCount(4);
+});
+
+it('replaces the question set when saving a shorter quiz', function () {
+    $this->putJson(route('admin.quiz.save', $this->session), ['questions' => [$this->questions[0]]], $this->adminHeaders)->assertOk();
+
+    expect($this->session->fresh()->config->quiz())->toHaveCount(1);
 });

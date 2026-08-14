@@ -46,10 +46,14 @@ test('participant page renders a live quiz without crashing', async ({ page }) =
     expect(errors).toEqual([]);
     await page.getByText(/^A\./).click();
 
-    // Single group: the first correct answer grades + finishes the run.
+    // Single group: the first correct answer grades + finishes the run —
+    // the live card unmounts (status becomes done). Synchronize on the UI
+    // before asserting the board, so the API check can't race the POST.
+    await expect(page.getByText('Capital of France?')).toBeHidden({ timeout: 5000 });
+    await expect
+        .poll(async () => (await (await request.get(`/api/sessions/${code}/board`, { headers: { 'X-Device-Token': token } })).json()).quiz.status, { timeout: 5000 })
+        .toBe('done');
     const board = await request.get(`/api/sessions/${code}/board`, { headers: { 'X-Device-Token': token } });
-    const quiz = (await board.json()).quiz;
-    expect(quiz.status).toBe('done');
-    expect(quiz.leaderboard[0].points).toBe(10);
+    expect((await board.json()).quiz.leaderboard[0].points).toBe(10);
     expect(errors).toEqual([]);
 });

@@ -53,7 +53,7 @@ import { existsSync, readFileSync } from 'node:fs';
 const poll = setInterval(() => {
     if (existsSync('/tmp/fanout-ts')) {
         const v = parseInt(readFileSync('/tmp/fanout-ts', 'utf8').trim(), 10);
-        if (!Number.isNaN(v) && v > 1e12) {
+        if (!Number.isNaN(v) && v > 1e12 && Date.now() - v < 300000) { // freshness: ignore stale triggers
             t0 = v;
             triggered = 1;
             clearInterval(poll);
