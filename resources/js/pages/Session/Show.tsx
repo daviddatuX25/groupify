@@ -449,6 +449,7 @@ export default function Show({ session }: { session: SessionProps }) {
                                                 <span className="flex gap-1">
                                                     <button
                                                         type="button"
+                                                        aria-label={`approve ${p.name}`}
                                                         onClick={() =>
                                                             mutate(`/s/${data.code}/groups/${g.id}/requests/${p.id}/approve`)
                                                         }
@@ -458,6 +459,7 @@ export default function Show({ session }: { session: SessionProps }) {
                                                     </button>
                                                     <button
                                                         type="button"
+                                                        aria-label={`reject ${p.name}`}
                                                         onClick={() =>
                                                             mutate(`/s/${data.code}/groups/${g.id}/requests/${p.id}/reject`)
                                                         }
