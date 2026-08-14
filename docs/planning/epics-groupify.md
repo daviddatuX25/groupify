@@ -1,8 +1,8 @@
 ---
 title: Groupify — Epics & Stories
-status: draft
+status: complete
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-08-15
 stepsCompleted: [epics, stories, acceptance-criteria, traceability]
 ---
 
