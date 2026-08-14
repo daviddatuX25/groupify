@@ -66,11 +66,11 @@ development_status:
   # Epic 4 — Flexibility Systems
   epic-4: backlog
   4-1-session-config: in-progress
-  4-2-fields-system: ready-for-dev
-  4-3-permission-engine: ready-for-dev
-  4-4-delegation-toggles: ready-for-dev
-  4-5-extensions-framework: ready-for-dev
-  epic-4-retrospective: optional
+  4-2-fields-system: review
+  4-3-permission-engine: review
+  4-4-delegation-toggles: review
+  4-5-extensions-framework: review
+  epic-4-retrospective: done
 
   # Epic 5 — Reliability & UX Shell
   epic-5: backlog

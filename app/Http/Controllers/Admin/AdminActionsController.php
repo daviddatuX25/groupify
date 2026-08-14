@@ -51,7 +51,7 @@ class AdminActionsController
             if ($toGroupId !== null) {
                 /** @var Group $target */
                 $target = Group::query()->lockForUpdate()->findOrFail($toGroupId);
-                if ($target->memberships()->where('status', 'active')->count() >= (int) $session->config->rules()['max_members']) {
+                if ($target->openSlots($session) <= 0) {
                     throw ValidationException::withMessages(['to_group_id' => 'Target group is full.']);
                 }
                 $target->memberships()->create([

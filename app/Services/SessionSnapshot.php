@@ -18,8 +18,6 @@ class SessionSnapshot
      */
     public function build(Session $session, ?Participant $me): array
     {
-        $capacity = max(1, (int) $session->config->rules()['max_members']);
-
         $groups = $session->groups()
             ->withCount(['memberships as member_count' => fn ($q) => $q->where('status', 'active')])
             ->orderBy('name')
@@ -48,8 +46,8 @@ class SessionSnapshot
                 'name' => $group->name,
                 'leader_id' => $group->leader_id,
                 'member_count' => (int) $group->member_count,
-                'capacity' => $capacity,
-                'open_slots' => max(0, $capacity - (int) $group->member_count),
+                'capacity' => $group->effectiveCapacity($session),
+                'open_slots' => $group->openSlots($session),
                 'field_values' => $group->field_values,
                 'members' => $group->memberships()
                     ->with('participant')

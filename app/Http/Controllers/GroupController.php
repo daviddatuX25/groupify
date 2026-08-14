@@ -9,6 +9,7 @@ use App\Models\Membership;
 use App\Models\Participant;
 use App\Models\Session;
 use App\Services\EventRecorder;
+use App\Services\PermissionService;
 use App\Support\GroupNamer;
 use App\Support\SessionConfig;
 use Illuminate\Http\JsonResponse;
@@ -32,17 +33,29 @@ class GroupController
 
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:80'],
+            'capacity' => ['sometimes', 'integer', 'min:'.$session->config->rules()['min_members'], 'max:'.$session->config->rules()['max_members']],
             'field_values' => ['sometimes', 'array'],
         ]);
 
         $config = $session->config;
+        $perms = app(PermissionService::class);
+
+        if (isset($data['capacity']) && ! $perms->can('set_group_size', 'leader', $config)) {
+            throw ValidationException::withMessages(['capacity' => 'Group size is controlled by the facilitator.']);
+        }
+
         $fieldValues = $this->validateFields($request, $config);
+        if ($fieldValues !== [] && ! $perms->can('fill_group_fields', 'leader', $config)) {
+            throw ValidationException::withMessages(['field_values' => 'Group fields are controlled by the facilitator.']);
+        }
+
         $name = trim($data['name'] ?? '') !== '' ? $data['name'] : GroupNamer::next($session);
 
-        $group = DB::transaction(function () use ($session, $me, $name, $fieldValues) {
+        $group = DB::transaction(function () use ($session, $me, $name, $fieldValues, $data) {
             $group = $session->groups()->create([
                 'leader_id' => $me->id,
                 'name' => $name,
+                'capacity' => $data['capacity'] ?? null,
                 'field_values' => $fieldValues,
             ]);
             $group->memberships()->create([
@@ -72,10 +85,9 @@ class GroupController
             throw ValidationException::withMessages(['group' => 'This session requires approval to join.']);
         }
 
-        $joined = DB::transaction(function () use ($group, $me, $config) {
+        $joined = DB::transaction(function () use ($group, $me, $session) {
             $group = Group::query()->lockForUpdate()->findOrFail($group->id);
-            $active = $group->memberships()->where('status', 'active')->count();
-            if ($active >= (int) $config->rules()['max_members']) {
+            if ($group->openSlots($session) <= 0) {
                 throw ValidationException::withMessages(['group' => 'This group is full.']);
             }
 

@@ -41,6 +41,19 @@ class Group extends Model
         return $this->belongsTo(Participant::class, 'leader_id');
     }
 
+    /** Capacity for this group (null = session max). Delegated size (FR-4.5). */
+    public function effectiveCapacity(Session $session): int
+    {
+        return $this->capacity ?? (int) $session->config->rules()['max_members'];
+    }
+
+    public function openSlots(Session $session): int
+    {
+        $active = $this->memberships()->where('status', 'active')->count();
+
+        return max(0, $this->effectiveCapacity($session) - $active);
+    }
+
     /**
      * @return HasMany<Membership, $this>
      */

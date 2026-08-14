@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Events\SessionConfigUpdated;
+use App\Extensions\ExtensionRegistry;
 use App\Models\Session;
 use App\Support\SessionConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class SessionConfigController
 {
@@ -24,6 +26,13 @@ class SessionConfigController
         );
 
         $validated = Validator::make($merged, self::rules())->validate();
+
+        $registry = app(ExtensionRegistry::class);
+        foreach ($validated['extensions'] ?? [] as $extension) {
+            if (! in_array($extension, $registry->registered(), true)) {
+                throw ValidationException::withMessages(['extensions' => 'Unknown extension: '.$extension]);
+            }
+        }
 
         // validate() drops unruled keys — merge back so future settings survive (AC 4).
         $data = array_replace_recursive($merged, $validated);
