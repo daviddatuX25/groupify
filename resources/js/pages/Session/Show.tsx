@@ -1,4 +1,6 @@
 import { echo, useConnectionStatus } from '@laravel/echo-react';
+import ComingNext from '@/components/ComingNext';
+import ServerStatus from '@/components/ServerStatus';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Member = { id: number; name: string; role: string };
@@ -64,8 +66,11 @@ export default function Show({ session }: { session: SessionProps }) {
         CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));
         channel.listen('MembershipChanged', (e: { group_id: number; action: string }) => {
             if (e.action === 'joined' || e.action === 'left') {
-                setFlash({ groupId: e.group_id, kind: e.action });
-                window.setTimeout(() => setFlash(null), 1200);
+                const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+                if (!reduced) {
+                    setFlash({ groupId: e.group_id, kind: e.action });
+                    window.setTimeout(() => setFlash(null), 1200);
+                }
             }
             refetch();
         });
@@ -151,6 +156,7 @@ export default function Show({ session }: { session: SessionProps }) {
                 </span>{' '}
                 and enter the PIN from your host.
             </div>
+            <ServerStatus />
 
             <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
                 <header className="flex items-center justify-between">
@@ -338,6 +344,7 @@ export default function Show({ session }: { session: SessionProps }) {
                     })}
                 </div>
             </div>
+            <ComingNext />
         </main>
     );
 }

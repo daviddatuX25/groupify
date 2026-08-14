@@ -1,4 +1,6 @@
 import { echo } from '@laravel/echo-react';
+import ComingNext from '@/components/ComingNext';
+import ServerStatus from '@/components/ServerStatus';
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 
@@ -131,6 +133,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     return (
         <main className="min-h-screen bg-slate-950 text-slate-100">
             <div className="mx-auto w-full max-w-7xl px-6 py-8">
+                <ServerStatus />
                 <header className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-extrabold tracking-tight">Groupify Admin</h1>
@@ -309,6 +312,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                 </>
                 )}
             </div>
+            <ComingNext />
         </main>
     );
 }

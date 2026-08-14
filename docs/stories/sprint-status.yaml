@@ -74,11 +74,11 @@ development_status:
 
   # Epic 5 — Reliability & UX Shell
   epic-5: backlog
-  5-1-server-status: ready-for-dev
-  5-2-mobile-shell: ready-for-dev
-  5-3-coming-next: ready-for-dev
-  5-4-accessibility: ready-for-dev
-  epic-5-retrospective: optional
+  5-1-server-status: review
+  5-2-mobile-shell: review
+  5-3-coming-next: review
+  5-4-accessibility: review
+  epic-5-retrospective: done
 
   # Epic 6 — Deploy & Ops
   epic-6: backlog
