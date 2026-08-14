@@ -6,6 +6,7 @@ use App\Models\Participant;
 use App\Models\Session;
 use App\Services\EventRecorder;
 use App\Support\RandomName;
+use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,9 +57,21 @@ class JoinController
             'device_token' => ['required', 'uuid'],
         ]);
 
+        // PIN brute-force guard: 10 wrong PINs per session within 5 minutes
+        // locks further attempts for that session only (mass joins from one
+        // NAT stay unaffected — the generic per-IP throttle is gone).
+        $limiter = app(RateLimiter::class);
+        $key = 'join-pin:'.$session->id;
+
         if (! hash_equals($session->pin, $data['pin'])) {
+            $limiter->hit($key, 5 * 60);
+            if ($limiter->tooManyAttempts($key, 10)) {
+                abort(429, 'Too many failed PIN attempts. Try again in a few minutes.');
+            }
             throw ValidationException::withMessages(['pin' => 'Wrong PIN.']);
         }
+
+        $limiter->clear($key);
 
         $name = trim($data['name']);
 

@@ -30,8 +30,7 @@ Route::post('/sessions', [SessionController::class, 'store'])->name('sessions.st
 // Participant entry (FR-2.1, FR-2.3, FR-2.4): join by code + PIN, seat check, session page
 Route::get('/join/{session:code}/seat', [JoinController::class, 'seat'])->name('join.seat');
 Route::get('/join/{session:code}', [JoinController::class, 'show'])->name('join.show');
-Route::post('/join/{session:code}', [JoinController::class, 'store'])
-    ->middleware('throttle:20,1')->name('join.store');
+Route::post('/join/{session:code}', [JoinController::class, 'store'])->name('join.store');
 Route::get('/s/{session:code}', [SessionPageController::class, 'show'])->name('session.show');
 
 // JSON board snapshot for realtime client updates (AD-6)
