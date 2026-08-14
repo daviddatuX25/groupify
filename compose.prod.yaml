@@ -1,3 +1,5 @@
+name: groupify-prod
+
 services:
   # Local test rig for the production image (6-3). Dokploy runs the same image.
   app-prod:
@@ -37,6 +39,11 @@ services:
     volumes:
       - groupify-sqlite:/var/www/html/database/data
       - groupify-storage:/var/www/html/storage
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "1.5"
     restart: unless-stopped
 
 volumes:

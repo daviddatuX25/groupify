@@ -14,3 +14,8 @@ database/database.sqlite
 bootstrap/cache/*.php
 public/build
 public/hot
+
+.browsers
+backups
+test-results
+playwright-report
