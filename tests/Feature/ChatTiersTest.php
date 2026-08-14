@@ -120,3 +120,66 @@ it('validates the message body', function () {
         'body' => '',
     ], $this->adminHeaders)->assertStatus(422)->assertJsonValidationErrors('body');
 });
+
+it('lets any participant post to the global hub visible to everyone', function () {
+    $this->postJson(route('messages.store', $this->session), [
+        'scope' => 'global',
+        'body' => 'Anyone looking for a group?',
+    ], $this->outsiderHeaders)->assertOk();
+
+    $this->getJson(route('messages.index', $this->session), $this->outsiderHeaders)
+        ->assertOk()
+        ->assertJsonPath('messages.0.scope', 'global')
+        ->assertJsonPath('messages.0.body', 'Anyone looking for a group?');
+});
+
+it('mutes global chat writes when configured', function () {
+    $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), [
+        'rules' => ['chat_enabled' => true, 'global_chat_mode' => 'muted'],
+    ])]);
+
+    $this->postJson(route('messages.store', $this->session), [
+        'scope' => 'global',
+        'body' => 'Hello',
+    ], $this->outsiderHeaders)->assertStatus(422);
+
+    $this->getJson(route('messages.index', $this->session), $this->outsiderHeaders)->assertOk(); // reads still work
+});
+
+it('queues global posts for moderation and lets the admin approve or reject', function () {
+    $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), [
+        'rules' => ['chat_enabled' => true, 'global_chat_mode' => 'moderated'],
+    ])]);
+
+    $this->postJson(route('messages.store', $this->session), [
+        'scope' => 'global',
+        'body' => 'Helpful question',
+    ], $this->outsiderHeaders)->assertOk();
+
+    $pending = SessionMessage::query()->where('status', 'pending')->sole();
+
+    // Invisible to participants until approved
+    $this->getJson(route('messages.index', $this->session), $this->outsiderHeaders)
+        ->assertOk()
+        ->assertJsonCount(0, 'messages');
+
+    // Admin list + approve
+    $this->getJson(route('admin.messages.pending', $this->session), $this->adminHeaders)
+        ->assertOk()
+        ->assertJsonCount(1, 'messages')
+        ->assertJsonPath('messages.0.body', 'Helpful question');
+
+    $this->postJson(route('admin.messages.decide', [$this->session, $pending]), ['action' => 'approve'], $this->adminHeaders)
+        ->assertOk();
+
+    $this->getJson(route('messages.index', $this->session), $this->outsiderHeaders)
+        ->assertOk()
+        ->assertJsonCount(1, 'messages');
+
+    // Reject path
+    $this->postJson(route('messages.store', $this->session), ['scope' => 'global', 'body' => 'Spam'], $this->outsiderHeaders)->assertOk();
+    $spam = SessionMessage::query()->where('body', 'Spam')->sole();
+    $this->postJson(route('admin.messages.decide', [$this->session, $spam]), ['action' => 'reject'], $this->adminHeaders)->assertOk();
+
+    expect(SessionMessage::query()->where('body', 'Spam')->count())->toBe(0);
+});

@@ -39,6 +39,7 @@ class SessionConfig implements Arrayable, JsonSerializable
                 'anonymous_mode' => false,
                 'chat_enabled' => false,
                 'group_chat_mode' => 'open', // open | leader
+                'global_chat_mode' => 'open', // open | muted | moderated
             ],
             'fields' => [],
             'perms' => [],

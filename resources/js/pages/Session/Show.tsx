@@ -445,6 +445,33 @@ export default function Show({ session }: { session: SessionProps }) {
                                     </div>
                                 ))}
                             </div>
+                            <div className="mt-3 flex gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Post to the room…"
+                                    value={chatDraft}
+                                    onChange={(e) => setChatDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && chatDraft.trim()) {
+                                            const body = chatDraft;
+                                            setChatDraft('');
+                                            void fetch(`/s/${data.code}/messages`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    Accept: 'application/json',
+                                                    'X-Device-Token': deviceToken,
+                                                    'X-XSRF-TOKEN': decodeURIComponent(
+                                                        document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                                    ),
+                                                },
+                                                body: JSON.stringify({ scope: 'global', body }),
+                                            }).then((r) => { if (r.ok) refetch(); });
+                                        }
+                                    }}
+                                    className="flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                                />
+                            </div>
                             {meIn && (
                                 <div className="mt-3 flex gap-2">
                                     <input

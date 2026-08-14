@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminActionsController;
 use App\Http\Controllers\Admin\AdminActivityController;
 use App\Http\Controllers\Admin\AdminExportController;
+use App\Http\Controllers\Admin\AdminMessageController;
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Controllers\Admin\AdminTemplateController;
 use App\Http\Controllers\Admin\SessionConfigController;
@@ -62,6 +63,10 @@ Route::get('/admin/sessions/{session}/export', [AdminExportController::class, 'c
     ->name('admin.export');
 Route::get('/admin/sessions/{session}/activity', [AdminActivityController::class, 'index'])
     ->name('admin.activity');
+Route::get('/admin/sessions/{session}/messages/pending', [AdminMessageController::class, 'pending'])
+    ->name('admin.messages.pending');
+Route::post('/admin/sessions/{session}/messages/{message}/decide', [AdminMessageController::class, 'decide'])
+    ->name('admin.messages.decide');
 Route::get('/admin/sessions/{session}/templates', [AdminTemplateController::class, 'index'])
     ->name('admin.templates.index');
 Route::post('/admin/sessions/{session}/templates', [AdminTemplateController::class, 'store'])

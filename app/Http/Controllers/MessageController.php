@@ -36,7 +36,10 @@ class MessageController
         /** @var Collection<int, array<string, mixed>> $messages */
         $messages = SessionMessage::query()
             ->where('group_session_id', $session->id)
-            ->where(fn ($q) => $q->where('scope', 'announcement')->orWhereIn('group_id', $memberGroupIds))
+            ->where('status', 'visible')
+            ->where(fn ($q) => $q
+                ->whereIn('scope', ['announcement', 'global'])
+                ->orWhereIn('group_id', $memberGroupIds))
             ->with('author')
             ->orderByDesc('created_at')
             ->limit(50)
@@ -61,7 +64,7 @@ class MessageController
         abort_unless($session->config->rules()['chat_enabled'] ?? false, 404);
 
         $data = $request->validate([
-            'scope' => ['required', 'in:announcement,group'],
+            'scope' => ['required', 'in:announcement,group,global'],
             'group_id' => ['nullable', 'integer', 'exists:groups,id'],
             'body' => ['required', 'string', 'max:1000'],
         ]);
@@ -70,7 +73,16 @@ class MessageController
         $isAdmin = $requestAdmin !== '' && hash_equals($session->admin_token, $requestAdmin);
 
         $authorId = null;
-        if ($data['scope'] === 'announcement') {
+        $status = 'visible';
+        if ($data['scope'] === 'global') {
+            $me = $this->participant($request, $session);
+            $authorId = $me->id;
+            $mode = $session->config->rules()['global_chat_mode'] ?? 'open';
+            if ($mode === 'muted') {
+                throw ValidationException::withMessages(['scope' => 'Global chat is muted by the facilitator.']);
+            }
+            $status = $mode === 'moderated' ? 'pending' : 'visible';
+        } elseif ($data['scope'] === 'announcement') {
             $perms = app(PermissionService::class);
             abort_unless($isAdmin && $perms->can('announce', 'admin', $session->config), 404);
         } else {
@@ -99,10 +111,13 @@ class MessageController
             'group_id' => $data['group_id'] ?? null,
             'author_id' => $authorId,
             'scope' => $data['scope'],
+            'status' => $status,
             'body' => $data['body'],
         ]);
 
-        broadcast(new MessageCreated($session, $message->scope, $message->group_id))->toOthers();
+        if ($status === 'visible') {
+            broadcast(new MessageCreated($session, $message->scope, $message->group_id))->toOthers();
+        }
         $recorder->record($session, $data['scope'].'_message', ['group_id' => $data['group_id'] ?? null]);
 
         return response()->json(['ok' => true, 'message_id' => $message->id]);
