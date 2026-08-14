@@ -57,7 +57,7 @@ it('blocks joins while frozen and allows them again after unfreeze', function ()
         'pin' => $this->session->pin,
         'name' => 'Maya',
         'device_token' => $token,
-    ])->assertRedirect(route('session.show', $this->session));
+    ])->assertRedirect(route('session.show', ['session' => $this->session, 'device_token' => $token]));
 });
 
 it('archives a session and stops joins while staying viewable', function () {

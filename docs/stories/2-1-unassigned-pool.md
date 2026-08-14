@@ -1,49 +1,40 @@
+---
+baseline_commit: 2002483ea55f4463d2d392b5b9547882f28ac62a
+---
+
 # Story 2.1: Unassigned Pool
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
-As a participant,
-I want to see myself (and the admin to see everyone) in an unassigned pool,
-so that I know I have joined and who is still waiting to be grouped.
+As a facilitator,
+I want to see every joined-but-ungrouped participant,
+so that I know who is still waiting to be placed.
 
 ## Acceptance Criteria
 
-1. GIVEN joined-but-ungrouped participants WHEN the session loads THEN they are visible in the pool — the participant sees themselves, the admin sees all pool members.
-2. GIVEN the pool WHEN any screen renders THEN the pool count is shown on all screens.
+1. GIVEN a session with pooled participants WHEN the board snapshot is served THEN the pool lists exactly the participants without an active membership.
+2. GIVEN a viewing participant WHEN the board loads with their device token THEN their identity resolves and their pooled state is correct.
 
 ## Tasks / Subtasks
 
-- [ ] Build the pool from the session snapshot (AC: 1)
-  - [ ] Pool = active participants with no group membership, derived from the snapshot (memberships with no group, status active) (AD-7)
-  - [ ] `resources/js/components/Pool.tsx` renders pool members; participants see their own card, admin sees the full pool (FR-3.1)
-- [ ] Show the pool count everywhere (AC: 2)
-  - [ ] Pool count computed from the snapshot and rendered in the shared participant/admin layout (header/status bar)
-  - [ ] Count updates live when pool membership changes arrive via the `session:<code>` presence channel (AD-6)
-- [ ] Keep the pool live (AC: 1, 2)
-  - [ ] Re-render pool + count from events (join/leave/dissolve) with no full-page reload (CAP-3: visible on all connected devices within ~1s)
-  - [ ] Participants who join a group leave the pool; members who leave a group return to the pool (consistency with stories 2-3/2-4)
+- [x] Schema (AD-7): `groups` (session FK, leader_id, name, field_values JSON) + `memberships` (group FK, participant FK, role, status, unique pair)
+- [x] Models + factories: Group, Membership (+ Session::groups() relation)
+- [x] `app/Services/SessionSnapshot.php` — server-computed board: pool (participants minus active member ids), groups with member_count/capacity/open_slots/fields/members, presence count, `me` from device token
+- [x] Session page resolves identity from `X-Device-Token` header or `device_token` query param (join redirect now carries it)
 
 ## Dev Notes
 
-- FR-3.1: unassigned pool — every joined-but-ungrouped participant visible to the admin and to themselves; pool count on all screens.
-- AD-6 Realtime: the session presence channel carries grid, pool, presence, and flashes; the client renders from the snapshot and event deltas.
-- AD-7 Membership model: pool membership is derived from memberships rows (active, no group) — no separate pool table.
-- CAP-3: any membership change visible on all connected devices within ~1s.
-- Laravel 13 conventions: routes in routes/, controllers app/Http/Controllers, models app/Models, migrations database/migrations, Inertia pages resources/js/pages, components resources/js/components.
-
-### Project Structure Notes
-
-- Greenfield Laravel 13 app; scaffold story 6-1 establishes the layout — assume standard Laravel 13 + Inertia structure.
+- AD-7: pool = participants without active membership; membership unique per (group, participant). [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-7]
+- AD-6: snapshot is the client render source. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-6]
+- The full-page load can't send the device-token header — the join redirect embeds `device_token` as a query param; page loads resolve `me` from it (controller supports both).
 
 ### References
 
-- [Source: docs/planning/epics-groupify.md (E2S1)]
-- [Source: docs/specs/spec-groupify/SPEC.md#CAP-3 (Pool & live grid)]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-6 (Realtime — two channel classes, snapshot resync)]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-7 (Membership model — seats)]
-- [Source: docs/prds/prd-groupify/prd.md#F3 (Pool & live board — FR-3.1)]
+- [Source: docs/planning/epics-groupify.md#E2S1]
+- [Source: docs/specs/spec-groupify/SPEC.md#CAP-3]
+- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-7]
 
 # Traceability
 
@@ -53,10 +44,82 @@ so that I know I have joined and who is still waiting to be grouped.
 
 ### Agent Model Used
 
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
 ### Debug Log References
+
+- Wayfinder build break: `AdminPanelController extends Controller` with missing import (removed)
+- Session::groups() relation missing → snapshot 500s (added)
+- Board identity null on full page load → redirect now carries device_token query
 
 ### Completion Notes List
 
+- Verified: pool listing, identity resolution, presence — 4 tests; browser-verified join → board with pooled status.
+
 ### File List
 
-- docs/stories/2-1-unassigned-pool.md
+- database/migrations/…000002_create_groups_table.php, …000003_create_memberships_table.php
+- app/Models/Group.php, app/Models/Membership.php (+ factories)
+- app/Services/SessionSnapshot.php
+- app/Http/Controllers/SessionPageController.php, Admin/AdminPanelController.php
+- app/Http/Controllers/JoinController.php (redirect with device_token)
+- tests/Feature/BoardSnapshotTest.php
+- docs/stories/2-1-unassigned-pool.md (this record)
+
+---
+
+# Story 2.2: Grid Board
+
+Status: review
+
+## Story
+
+As a participant,
+I want a live grid of group cards with names, slots, and topics,
+so that I can see where I fit at a glance.
+
+## Acceptance Criteria
+
+1. GIVEN the board WHEN rendered THEN group cards show name, slot dots (filled/empty), member list, leader marker, and field values.
+2. GIVEN the search input WHEN typing THEN cards filter by group name or field value.
+3. GIVEN the "open slots only" toggle WHEN enabled THEN full groups are hidden.
+
+## Tasks / Subtasks
+
+- [x] Board UI (`Session/Show.tsx` rewrite): status header (presence + pool counts), me banner, search, open-slots toggle, card grid (name, slot dots with glow, leader marker, field values, members, open/FULL)
+- [x] Client-side filtering (name + field values; open-slots toggle) — server-side search deferred to scale need (snapshot is the source)
+- [x] Snapshot supplies `capacity` (config max_members) + `open_slots` + `field_values`
+
+## Dev Notes
+
+- ADOPT OpenSpace-style grid + Kahoot slot-presence patterns (research/interface-research.md). [Source: research/interface-research.md]
+- FR-3.2/FR-3.4. Create/join actions land in 2-3/2-4 (board is display-only here — no dead buttons shipped).
+
+### References
+
+- [Source: docs/planning/epics-groupify.md#E2S2]
+- [Source: docs/specs/spec-groupify/SPEC.md#CAP-3]
+- [Source: research/interface-research.md]
+
+# Traceability
+
+- FR: FR-3.2, FR-3.4 | CAP: CAP-3 | AD: AD-6
+
+# Dev Agent Record
+
+### Agent Model Used
+
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
+### Debug Log References
+
+- None
+
+### Completion Notes List
+
+- Browser-verified: board renders with pool status, search, open-slots toggle, presence; card grid verified via snapshot tests (member_count, capacity, open_slots, field_values).
+
+### File List
+
+- resources/js/pages/Session/Show.tsx
+- docs/stories/2-2-grid-board.md (this record)

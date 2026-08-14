@@ -23,7 +23,7 @@ export default function Join({ session }: { session: { code: string; status: str
             .then((res: { seat: boolean; name: string | null }) => {
                 if (res.seat && res.name) {
                     window.localStorage.setItem('groupify.participant_name', res.name);
-                    router.visit(`/s/${session.code}`);
+                    router.visit(`/s/${session.code}?device_token=${deviceToken}`);
                 } else {
                     setChecking(false);
                 }

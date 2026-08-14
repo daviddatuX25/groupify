@@ -64,6 +64,9 @@ class JoinController
             ['name' => $data['name'], 'email' => $data['email'] ?? null],
         );
 
-        return redirect()->route('session.show', $session);
+        return redirect()->route('session.show', [
+            'session' => $session,
+            'device_token' => $data['device_token'],
+        ]);
     }
 }

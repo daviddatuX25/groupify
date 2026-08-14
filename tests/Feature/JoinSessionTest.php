@@ -33,7 +33,7 @@ it('joins with the correct PIN, name, and email', function () {
         'name' => 'Maya',
         'email' => 'maya@example.com',
         'device_token' => $this->token,
-    ])->assertRedirect(route('session.show', $this->session));
+    ])->assertRedirect(route('session.show', ['session' => $this->session, 'device_token' => $this->token]));
 
     $participant = Participant::query()->sole();
 
@@ -48,7 +48,7 @@ it('joins with email optional', function () {
         'pin' => '4821',
         'name' => 'Leo',
         'device_token' => $this->token,
-    ])->assertRedirect(route('session.show', $this->session));
+    ])->assertRedirect(route('session.show', ['session' => $this->session, 'device_token' => $this->token]));
 
     expect(Participant::query()->sole()->email)->toBeNull();
 });
