@@ -1,5 +1,6 @@
 import { echo, useConnectionStatus } from '@laravel/echo-react';
 import ComingNext from '@/components/ComingNext';
+import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -255,7 +256,10 @@ export default function Show({ session }: { session: SessionProps }) {
             <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
                 <header className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-extrabold tracking-tight">Groupify</h1>
+                        <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight">
+                            <Logo className="h-7 w-7" />
+                            Groupify
+                        </h1>
                         <p className="mt-0.5 text-xs text-slate-500">
                             {data.presence} online · {data.pool.length} in the pool
                         </p>

@@ -1,5 +1,6 @@
 import { echo } from '@laravel/echo-react';
 import ComingNext from '@/components/ComingNext';
+import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
@@ -162,7 +163,10 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                 <ServerStatus />
                 <header className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-extrabold tracking-tight">Groupify Admin</h1>
+                        <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight">
+                            <Logo className="h-8 w-8" />
+                            Groupify Admin
+                        </h1>
                         <p className="mt-0.5 text-xs uppercase tracking-widest text-slate-500">
                             Live session control panel · {data.status}
                             {frozen ? ' · FROZEN' : ''}
