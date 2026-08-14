@@ -25,9 +25,6 @@ php artisan migrate --force
 php artisan config:cache || true
 php artisan route:cache || true
 
-# php-fpm runs as www-data: the SQLite file/dir and runtime caches must be
-# writable by it (a fresh volume is created root-owned by this script).
-chown -R www-data:www-data database/data storage bootstrap/cache
-chmod -R u+rwX,g+rwX database/data storage bootstrap/cache
-
+# Rootless: the whole container runs as www-data (Dockerfile USER), so
+# volumes, caches, and the SQLite file are naturally www-data-owned.
 exec supervisord -c /etc/supervisor/supervisord.conf

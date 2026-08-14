@@ -46,6 +46,8 @@ services:
           cpus: "1.5"
     security_opt:
       - no-new-privileges:true
+    cap_add:
+      - NET_BIND_SERVICE # nginx master binds :80 as www-data
     # Drop the dangerous capabilities; keep what php-fpm (setuid to www-data)
     # and nginx (:80) need. Full cap_drop breaks the entrypoint + php-fpm.
     cap_drop:
