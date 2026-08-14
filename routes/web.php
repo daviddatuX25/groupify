@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminActionsController;
 use App\Http\Controllers\Admin\AdminActivityController;
 use App\Http\Controllers\Admin\AdminExportController;
 use App\Http\Controllers\Admin\AdminPanelController;
+use App\Http\Controllers\Admin\AdminTemplateController;
 use App\Http\Controllers\Admin\SessionConfigController;
 use App\Http\Controllers\Admin\SessionStateController;
 use App\Http\Controllers\BoardController;
@@ -58,3 +59,9 @@ Route::get('/admin/sessions/{session}/export', [AdminExportController::class, 'c
     ->name('admin.export');
 Route::get('/admin/sessions/{session}/activity', [AdminActivityController::class, 'index'])
     ->name('admin.activity');
+Route::get('/admin/sessions/{session}/templates', [AdminTemplateController::class, 'index'])
+    ->name('admin.templates.index');
+Route::post('/admin/sessions/{session}/templates', [AdminTemplateController::class, 'store'])
+    ->name('admin.templates.store');
+Route::post('/admin/sessions/{session}/templates/{template}/apply', [AdminTemplateController::class, 'apply'])
+    ->name('admin.templates.apply');

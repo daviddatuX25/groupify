@@ -24,7 +24,7 @@ Phasing preserves the full vision (locked decision: cut scope, never the vision)
 - Moderation: kick & ban from group, global ban/blacklist, ghost-group GC + ownership transfer
 - Extensions shelf UI (toggle modules per session)
 - Activity/attendance report export (join-time, presence duration, group-hopping — from activity feed)
-- Session config templates (save/replay rules + fields + perms — Wordwall/Mentimeter pattern)
+- ~~Session config templates~~ — **SHIPPED (phase-2 story F, 2026-08-14)**
 
 ## Phase 3+
 

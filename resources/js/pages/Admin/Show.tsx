@@ -36,6 +36,8 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [activity, setActivity] = useState<{ type: string; payload: Record<string, unknown>; at: string }[]>([]);
     const [timerMin, setTimerMin] = useState('');
     const [guestListText, setGuestListText] = useState('');
+    const [templateName, setTemplateName] = useState('');
+    const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
     if (typeof window !== 'undefined' && session.admin_token) {
@@ -57,6 +59,11 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => {
                 if (json) setActivity(json.events);
+            });
+        fetch(`/admin/sessions/${session.id}/templates`, { headers: { 'X-Admin-Token': adminToken } })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) => {
+                if (json) setTemplates(json.templates);
             });
     };
 
@@ -373,6 +380,63 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                         </span>
                     ))}
                     {data.pool.length === 0 && <p className="text-sm text-slate-500">Everyone is grouped.</p>}
+                </div>
+
+                {/* Session templates (phase-2 F) */}
+                <div className="mt-8 flex flex-wrap items-center gap-2">
+                    <input
+                        type="text"
+                        placeholder="Template name"
+                        value={templateName}
+                        onChange={(e) => setTemplateName(e.target.value)}
+                        className="w-44 rounded-lg border border-white/10 bg-slate-950 px-3 py-1.5 text-sm outline-none focus:border-cyan-400"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const name = templateName.trim();
+                            if (!name) return;
+                            void fetch(`/admin/sessions/${session.id}/templates`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    Accept: 'application/json',
+                                    'X-Admin-Token': adminToken,
+                                    'X-XSRF-TOKEN': decodeURIComponent(
+                                        document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                    ),
+                                },
+                                body: JSON.stringify({ name }),
+                            }).then((r) => { if (r.ok) { setTemplateName(''); refetch(); } });
+                        }}
+                        className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+                    >
+                        Save current config as template
+                    </button>
+                    {templates.map((t) => (
+                        <span key={t.id} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs">
+                            {t.name}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void fetch(`/admin/sessions/${session.id}/templates/${t.id}/apply`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            Accept: 'application/json',
+                                            'X-Admin-Token': adminToken,
+                                            'X-XSRF-TOKEN': decodeURIComponent(
+                                                document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                            ),
+                                        },
+                                    }).then((r) => { if (r.ok) refetch(); });
+                                }}
+                                className="text-cyan-400 hover:text-cyan-300"
+                            >
+                                apply
+                            </button>
+                        </span>
+                    ))}
                 </div>
 
                 {/* Activity feed (3-6) */}

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Session;
+use App\Models\SessionTemplate;
 use App\Support\SessionConfig;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,9 +22,9 @@ class SessionController
     }
 
     /** POST /sessions — create a session; creator becomes admin via token (AD-3). */
-    public function store(): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
-        $session = $this->createSession();
+        $session = $this->createSession($request);
 
         return redirect()->route('admin.sessions.show', [
             'session' => $session,
@@ -34,8 +36,14 @@ class SessionController
      * 6-digit numeric code (retry on collision), 4-digit PIN, bearer admin token.
      * AD-4: default config seeded at creation.
      */
-    private function createSession(): Session
+    private function createSession(Request $request): Session
     {
+        $template = null;
+        $templateId = $request->input('template_id');
+        if ($templateId !== null) {
+            $template = SessionTemplate::query()->findOrFail((int) $templateId);
+        }
+
         for ($attempt = 0; $attempt < 10; $attempt++) {
             $code = (string) random_int(100000, 999999);
 
@@ -49,7 +57,7 @@ class SessionController
                     'pin' => (string) random_int(1000, 9999),
                     'admin_token' => Str::random(40),
                     'status' => 'live',
-                    'config' => SessionConfig::defaults(),
+                    'config' => $template !== null ? $template->config->toArray() : SessionConfig::defaults(),
                 ]);
             } catch (UniqueConstraintViolationException) {
                 // A concurrent create took the code — retry.
