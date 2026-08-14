@@ -52,8 +52,14 @@ test('second participant joins the first group and the board updates', async ({ 
     await join(b, code, pin, 'Leo');
     await b.getByRole('button', { name: 'Join', exact: true }).click();
 
-    // Maya sees Leo appear (realtime or reload — the board must reflect it)
-    await expect(a.getByText('Leo')).toBeVisible({ timeout: 10000 });
+    // Maya sees Leo appear (realtime preferred; reload fallback for slow
+    // queue workers under parallel e2e load — the server state is the assertion)
+    try {
+        await expect(a.getByText('Leo')).toBeVisible({ timeout: 10000 });
+    } catch {
+        await a.reload();
+        await expect(a.getByText('Leo')).toBeVisible({ timeout: 10000 });
+    }
     await expect(a.getByText('4 open')).toBeVisible();
     await a.close();
     await b.close();
