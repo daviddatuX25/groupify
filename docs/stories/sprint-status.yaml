@@ -40,7 +40,7 @@ development_status:
   1-5-session-states: review
   1-6-join-instruction-bar: review
   1-7-auto-purge: review
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   # Epic 2 — Live Board & Groups
   epic-2: backlog
@@ -93,4 +93,16 @@ development_status:
 # templates, activity export, custom roles, PWA, offline mode) is roadmap-owned,
 # NOT in this sprint — see docs/specs/spec-groupify/roadmap.md
 
-action_items: []
+action_items:
+  - epic: 1
+    action: "Verify production scheduler wiring for sessions:purge on Dokploy (cron/schedule:work) at E6S3"
+    owner: "dev loop"
+    status: open
+  - epic: 1
+    action: "Add leave/create-group/move/dissolve freeze enforcement with Epic 2 mutations (AD-7 transactional checks)"
+    owner: "dev loop"
+    status: open
+  - epic: 1
+    action: "Run bmad-code-review over E1 in a fresh context before Epic 2 (4 stories pending review gate)"
+    owner: "user"
+    status: open
