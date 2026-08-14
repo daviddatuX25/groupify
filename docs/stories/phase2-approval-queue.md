@@ -57,7 +57,7 @@ opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
 ### Completion Notes List
 
 - 7 tests green (91 total, 350 assertions); e2e 6/6 regression pass; approval flow verified live (request → approve → member, pending cleared).
-- First phase-2 slice shipped; the applicant-queue UI for the admin (3-tier view) remains a later slice.
+- First phase-2 slice shipped; the admin-side queue view shipped 2026-08-14 (phase-2 story G): admin approve/reject on any pending request + Pending Requests panel.
 
 ### File List
 

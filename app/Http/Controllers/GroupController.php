@@ -188,17 +188,23 @@ class GroupController
     /** Leader approves a pending join request (FR-4.2, CAP-4). */
     public function approve(Request $request, Session $session, Group $group, Participant $participant, EventRecorder $recorder): JsonResponse
     {
-        $me = $this->participant($request, $session);
         $this->assertMutable($session);
         $this->assertGroupInSession($group, $session);
 
-        if ($group->leader_id !== $me->id) {
-            abort(404);
-        }
+        // Admin may act on any pending request; otherwise the group leader decides.
+        $requestAdmin = $request->header('X-Admin-Token', '');
+        $isAdmin = $requestAdmin !== '' && hash_equals($session->admin_token, $requestAdmin);
 
-        $perms = app(PermissionService::class);
-        if (! $perms->can('approve_join', 'leader', $session->config)) {
-            throw ValidationException::withMessages(['group' => 'Approvals are controlled by the facilitator.']);
+        if (! $isAdmin) {
+            $me = $this->participant($request, $session);
+            if ($group->leader_id !== $me->id) {
+                abort(404);
+            }
+
+            $perms = app(PermissionService::class);
+            if (! $perms->can('approve_join', 'leader', $session->config)) {
+                throw ValidationException::withMessages(['group' => 'Approvals are controlled by the facilitator.']);
+            }
         }
 
         $membership = Membership::query()
@@ -220,17 +226,23 @@ class GroupController
     /** Leader rejects a pending join request. */
     public function reject(Request $request, Session $session, Group $group, Participant $participant, EventRecorder $recorder): JsonResponse
     {
-        $me = $this->participant($request, $session);
         $this->assertMutable($session);
         $this->assertGroupInSession($group, $session);
 
-        if ($group->leader_id !== $me->id) {
-            abort(404);
-        }
+        // Admin may act on any pending request; otherwise the group leader decides.
+        $requestAdmin = $request->header('X-Admin-Token', '');
+        $isAdmin = $requestAdmin !== '' && hash_equals($session->admin_token, $requestAdmin);
 
-        $perms = app(PermissionService::class);
-        if (! $perms->can('approve_join', 'leader', $session->config)) {
-            throw ValidationException::withMessages(['group' => 'Approvals are controlled by the facilitator.']);
+        if (! $isAdmin) {
+            $me = $this->participant($request, $session);
+            if ($group->leader_id !== $me->id) {
+                abort(404);
+            }
+
+            $perms = app(PermissionService::class);
+            if (! $perms->can('approve_join', 'leader', $session->config)) {
+                throw ValidationException::withMessages(['group' => 'Approvals are controlled by the facilitator.']);
+            }
         }
 
         $membership = Membership::query()

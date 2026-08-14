@@ -106,3 +106,27 @@ it('does not count pending requests toward capacity', function () {
 
     expect($this->group->openSlots($this->session))->toBe(0); // leader occupies the one slot
 });
+
+it('lets the admin approve or reject any pending request', function () {
+    $this->postJson(route('groups.join', [$this->session, $this->group]), [], $this->requesterHeaders)->assertOk();
+
+    $admin = ['X-Admin-Token' => $this->session->admin_token, 'Accept' => 'application/json'];
+
+    $this->postJson(route('groups.approve', [$this->session, $this->group, $this->requester]), [], $admin)->assertOk();
+
+    expect(Membership::query()->where('participant_id', $this->requester->id)->first()->status)->toBe('active');
+
+    $second = Participant::factory()->create(['group_session_id' => $this->session->id, 'name' => 'Zoe']);
+    $this->postJson(route('groups.join', [$this->session, $this->group]), [], ['X-Device-Token' => $second->token, 'Accept' => 'application/json'])->assertOk();
+    $this->postJson(route('groups.reject', [$this->session, $this->group, $second]), [], $admin)->assertOk();
+
+    expect(Membership::query()->where('participant_id', $second->id)->count())->toBe(0);
+});
+
+it('exposes every pending request to the admin board', function () {
+    $this->postJson(route('groups.join', [$this->session, $this->group]), [], $this->requesterHeaders)->assertOk();
+
+    $this->getJson(route('board.show', $this->session), ['X-Admin-Token' => $this->session->admin_token, 'Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('groups.0.pending.0.name', 'Leo');
+});

@@ -382,6 +382,62 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                     {data.pool.length === 0 && <p className="text-sm text-slate-500">Everyone is grouped.</p>}
                 </div>
 
+                {/* Pending requests across groups (phase-2 A completion) */}
+                {data.groups.some((g) => (g as Group & { pending?: { id: number; name: string }[] }).pending?.length) && (
+                    <div className="mt-8 rounded-2xl border border-cyan-400/20 bg-slate-900 p-4">
+                        <h2 className="text-sm font-bold uppercase tracking-wide text-cyan-400">Pending requests</h2>
+                        {data.groups.map((g) =>
+                            (g as Group & { pending?: { id: number; name: string }[] }).pending?.map((p) => (
+                                <div key={p.id} className="mt-2 flex items-center justify-between text-sm">
+                                    <span>
+                                        {p.name} → <span className="text-slate-400">{g.name}</span>
+                                    </span>
+                                    <span className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                void fetch(`/s/${data.code}/groups/${g.id}/requests/${p.id}/approve`, {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                        Accept: 'application/json',
+                                                        'X-Admin-Token': adminToken,
+                                                        'X-XSRF-TOKEN': decodeURIComponent(
+                                                            document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                                        ),
+                                                    },
+                                                }).then((r) => { if (r.ok) refetch(); })
+                                            }
+                                            className="rounded bg-emerald-400/15 px-2 py-0.5 text-xs text-emerald-300"
+                                        >
+                                            approve
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                void fetch(`/s/${data.code}/groups/${g.id}/requests/${p.id}/reject`, {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                        Accept: 'application/json',
+                                                        'X-Admin-Token': adminToken,
+                                                        'X-XSRF-TOKEN': decodeURIComponent(
+                                                            document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                                        ),
+                                                    },
+                                                }).then((r) => { if (r.ok) refetch(); })
+                                            }
+                                            className="rounded bg-rose-400/15 px-2 py-0.5 text-xs text-rose-300"
+                                        >
+                                            reject
+                                        </button>
+                                    </span>
+                                </div>
+                            )),
+                        )}
+                    </div>
+                )}
+
                 {/* Session templates (phase-2 F) */}
                 <div className="mt-8 flex flex-wrap items-center gap-2">
                     <input
