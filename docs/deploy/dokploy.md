@@ -10,6 +10,25 @@ config-level recipe, and everything here is locally tested via
 - Your Dokploy server URL + API credentials (to create the application).
 - DNS: `groupify.dxtechph.online` → your Dokploy server IP (A record).
 
+## Alternative: deploy from an image registry (no GitHub needed)
+
+If you'd rather not push the source, publish the image and deploy that:
+
+```bash
+docker login                           # Docker Hub (or any registry)
+docker build -f Dockerfile.prod \
+  --build-arg VITE_REVERB_HOST=groupify.dxtechph.online \
+  --build-arg VITE_REVERB_PORT=443 --build-arg VITE_REVERB_SCHEME=https \
+  --build-arg VITE_REVERB_APP_KEY=<random hex> \
+  -t <your-user>/groupify:1.0.0 .
+docker push <your-user>/groupify:1.0.0
+```
+
+Then in Dokploy: **New Application → Docker (Image) type** with
+`<your-user>/groupify:1.0.0`, same env + volumes + domain as below. The
+registry variant skips the git remote entirely; the image already contains
+the boot chain (entrypoint migrate/cache/APP_KEY + rootless drop).
+
 ## Steps (Dokploy UI)
 
 0. **Git remote** — Dokploy deploys from a git repository. Push this repo to
