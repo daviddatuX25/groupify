@@ -156,3 +156,19 @@ it('broadcasts membership changes', function () {
 it('requires a valid device token for mutations', function () {
     $this->postJson(routeStore($this->session), [], ['Accept' => 'application/json'])->assertStatus(422);
 });
+
+it('blocks creation when the facilitator disabled user creation', function () {
+    $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), ['rules' => ['allow_user_creation' => false]])]);
+
+    $this->postJson(routeStore($this->session), [], $this->headers)
+        ->assertStatus(422)->assertJsonValidationErrors('group');
+});
+
+it('blocks creation when a session override denies members create_group', function () {
+    $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), [
+        'perms' => ['create_group' => ['member' => false]],
+    ])]);
+
+    $this->postJson(routeStore($this->session), [], $this->headers)
+        ->assertStatus(422)->assertJsonValidationErrors('group');
+});

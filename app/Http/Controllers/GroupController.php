@@ -40,6 +40,10 @@ class GroupController
         $config = $session->config;
         $perms = app(PermissionService::class);
 
+        if (! $config->rules()['allow_user_creation'] || ! $perms->can('create_group', 'member', $config)) {
+            throw ValidationException::withMessages(['group' => 'Group creation is disabled by the facilitator.']);
+        }
+
         if (isset($data['capacity']) && ! $perms->can('set_group_size', 'leader', $config)) {
             throw ValidationException::withMessages(['capacity' => 'Group size is controlled by the facilitator.']);
         }
