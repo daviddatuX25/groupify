@@ -13,7 +13,8 @@ Route::inertia('/', 'welcome')->name('home');
 Route::get('/new', [SessionController::class, 'new'])->name('sessions.new');
 Route::post('/sessions', [SessionController::class, 'store'])->name('sessions.store');
 
-// Participant entry (FR-2.1, FR-2.3): join by code + PIN, then the session page
+// Participant entry (FR-2.1, FR-2.3, FR-2.4): join by code + PIN, seat check, session page
+Route::get('/join/{session:code}/seat', [JoinController::class, 'seat'])->name('join.seat');
 Route::get('/join/{session:code}', [JoinController::class, 'show'])->name('join.show');
 Route::post('/join/{session:code}', [JoinController::class, 'store'])->name('join.store');
 Route::get('/s/{session:code}', [SessionPageController::class, 'show'])->name('session.show');

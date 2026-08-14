@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Participant;
 use App\Models\Session;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +18,25 @@ class JoinController
     {
         return Inertia::render('Session/Join', [
             'session' => ['code' => $session->code, 'status' => $session->status],
+        ]);
+    }
+
+    /**
+     * GET /join/{code}/seat — does this device token already hold a seat? (FR-2.4)
+     * Returning devices skip the form and land straight in their seat.
+     */
+    public function seat(Request $request, Session $session): JsonResponse
+    {
+        $data = $request->validate(['token' => ['required', 'uuid']]);
+
+        $participant = Participant::query()
+            ->where('group_session_id', $session->id)
+            ->where('token', $data['token'])
+            ->first();
+
+        return response()->json([
+            'seat' => $participant !== null,
+            'name' => $participant?->name,
         ]);
     }
 

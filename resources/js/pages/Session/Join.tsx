@@ -1,7 +1,9 @@
-import { useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { router, useForm } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 export default function Join({ session }: { session: { code: string; status: string } }) {
+    const [checking, setChecking] = useState(false);
+
     const deviceToken = useMemo(() => {
         if (typeof window === 'undefined') return '';
         let t = window.localStorage.getItem('groupify.device_token');
@@ -12,12 +14,37 @@ export default function Join({ session }: { session: { code: string; status: str
         return t;
     }, []);
 
+    // FR-2.4: a returning device with a seat skips the form and lands straight in.
+    useEffect(() => {
+        if (!deviceToken) return;
+        setChecking(true);
+        fetch(`/join/${session.code}/seat?token=${deviceToken}`)
+            .then((r) => r.json())
+            .then((res: { seat: boolean; name: string | null }) => {
+                if (res.seat && res.name) {
+                    window.localStorage.setItem('groupify.participant_name', res.name);
+                    router.visit(`/s/${session.code}`);
+                } else {
+                    setChecking(false);
+                }
+            })
+            .catch(() => setChecking(false));
+    }, [deviceToken, session.code]);
+
     const { data, setData, post, processing, errors } = useForm({
         pin: '',
         name: '',
         email: '',
         device_token: deviceToken,
     });
+
+    if (checking) {
+        return (
+            <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100">
+                <p className="text-slate-400">Checking your seat…</p>
+            </main>
+        );
+    }
 
     const submit = () => {
         window.localStorage.setItem('groupify.participant_name', data.name);
