@@ -8,6 +8,7 @@ use App\Models\Group;
 use App\Models\Membership;
 use App\Models\Participant;
 use App\Models\Session;
+use App\Services\EventRecorder;
 use App\Support\GroupNamer;
 use App\Support\SessionConfig;
 use Illuminate\Http\JsonResponse;
@@ -23,7 +24,7 @@ use Illuminate\Validation\ValidationException;
  */
 class GroupController
 {
-    public function store(Request $request, Session $session): JsonResponse
+    public function store(Request $request, Session $session, EventRecorder $recorder): JsonResponse
     {
         $me = $this->participant($request, $session);
         $this->assertMutable($session);
@@ -54,11 +55,12 @@ class GroupController
         });
 
         broadcast(new GroupCreated($group))->toOthers();
+        $recorder->record($session, 'group_created', ['group_id' => $group->id, 'name' => $group->name]);
 
         return response()->json(['ok' => true, 'group_id' => $group->id, 'name' => $group->name]);
     }
 
-    public function join(Request $request, Session $session, Group $group): JsonResponse
+    public function join(Request $request, Session $session, Group $group, EventRecorder $recorder): JsonResponse
     {
         $me = $this->participant($request, $session);
         $this->assertMutable($session);
@@ -85,11 +87,12 @@ class GroupController
         });
 
         broadcast(new MembershipChanged($session, $group->id, 'joined'))->toOthers();
+        $recorder->record($session, 'member_joined', ['group_id' => $group->id, 'name' => $me->name]);
 
         return response()->json(['ok' => true, 'membership_id' => $joined->id]);
     }
 
-    public function leave(Request $request, Session $session, Group $group): JsonResponse
+    public function leave(Request $request, Session $session, Group $group, EventRecorder $recorder): JsonResponse
     {
         $me = $this->participant($request, $session);
         $this->assertMutable($session);
@@ -126,6 +129,7 @@ class GroupController
         });
 
         broadcast(new MembershipChanged($session, $group->id, $wasLeader ? 'leader_changed' : 'left'))->toOthers();
+        $recorder->record($session, 'member_left', ['group_id' => $group->id, 'name' => $me->name]);
 
         return response()->json(['ok' => true]);
     }

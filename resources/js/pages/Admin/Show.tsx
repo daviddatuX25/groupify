@@ -31,6 +31,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [ready, setReady] = useState(false);
     const [showJoinInfo, setShowJoinInfo] = useState(true);
     const [showBoard, setShowBoard] = useState(true);
+    const [activity, setActivity] = useState<{ type: string; payload: Record<string, unknown>; at: string }[]>([]);
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
     if (typeof window !== 'undefined' && session.admin_token) {
@@ -47,6 +48,11 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => {
                 if (json) setBoard(json as Board);
+            });
+        fetch(`/admin/sessions/${session.id}/activity`, { headers: { 'X-Admin-Token': adminToken } })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) => {
+                if (json) setActivity(json.events);
             });
     };
 
@@ -286,6 +292,20 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                     ))}
                     {data.pool.length === 0 && <p className="text-sm text-slate-500">Everyone is grouped.</p>}
                 </div>
+
+                {/* Activity feed (3-6) */}
+                <h2 className="mt-8 text-sm font-bold uppercase tracking-wide text-slate-400">Recent activity</h2>
+                <ul className="mt-3 space-y-1.5 text-sm text-slate-400">
+                    {activity.length === 0 && <li className="text-slate-600">No activity yet.</li>}
+                    {activity.slice(0, 15).map((e, i) => (
+                        <li key={i} className="flex justify-between gap-4">
+                            <span>{e.type.replace(/_/g, ' ')}</span>
+                            <span className="font-mono text-xs text-slate-600">
+                                {new Date(e.at).toLocaleTimeString()}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
                 </>
                 )}
             </div>

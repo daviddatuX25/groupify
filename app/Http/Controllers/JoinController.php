@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Participant;
 use App\Models\Session;
+use App\Services\EventRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,7 +42,7 @@ class JoinController
     }
 
     /** POST /join/{code} — validate PIN + identity, create/reuse the seat (AD-7). */
-    public function store(Request $request, Session $session): RedirectResponse
+    public function store(Request $request, Session $session, EventRecorder $recorder): RedirectResponse
     {
         if ($session->status !== 'live' || $session->config->rules()['freeze']) {
             abort(404);
@@ -63,6 +64,10 @@ class JoinController
             ['group_session_id' => $session->id, 'token' => $data['device_token']],
             ['name' => $data['name'], 'email' => $data['email'] ?? null],
         );
+
+        if ($participant->wasRecentlyCreated) {
+            $recorder->record($session, 'participant_joined', ['name' => $participant->name]);
+        }
 
         return redirect()->route('session.show', [
             'session' => $session,

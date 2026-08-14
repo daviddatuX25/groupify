@@ -7,6 +7,7 @@ use App\Models\Group;
 use App\Models\Membership;
 use App\Models\Participant;
 use App\Models\Session;
+use App\Services\EventRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +22,7 @@ class AdminActionsController
     use AuthorizesAdminToken;
 
     /** Force-move a member to another group or back to the pool (kick). */
-    public function move(Request $request, Session $session, Participant $participant): JsonResponse
+    public function move(Request $request, Session $session, Participant $participant, EventRecorder $recorder): JsonResponse
     {
         $this->authorizeAdmin($session, $request);
 
@@ -66,12 +67,13 @@ class AdminActionsController
         });
 
         broadcast(new MembershipChanged($session, (int) $targetGroupId, 'moved'))->toOthers();
+        $recorder->record($session, 'member_moved', ['participant' => $participant->name, 'to_group_id' => $targetGroupId === 0 ? null : $targetGroupId]);
 
         return response()->json(['ok' => true, 'to_group_id' => $targetGroupId === 0 ? null : $targetGroupId]);
     }
 
     /** Dissolve one group or all groups — everyone back to the pool. */
-    public function dissolve(Request $request, Session $session): JsonResponse
+    public function dissolve(Request $request, Session $session, EventRecorder $recorder): JsonResponse
     {
         $this->authorizeAdmin($session, $request);
 
@@ -99,6 +101,7 @@ class AdminActionsController
         });
 
         broadcast(new MembershipChanged($session, (int) ($groupId ?? 0), 'dissolved'))->toOthers();
+        $recorder->record($session, 'groups_dissolved', ['group_id' => $groupId, 'affected' => $affected]);
 
         return response()->json(['ok' => true, 'affected' => $affected]);
     }

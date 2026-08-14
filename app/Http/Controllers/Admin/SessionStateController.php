@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Events\SessionDeleted;
 use App\Events\SessionStateUpdated;
 use App\Models\Session;
+use App\Services\EventRecorder;
 use App\Support\SessionConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class SessionStateController
     use AuthorizesAdminToken;
 
     /** Freeze / unfreeze (config rules.freeze, AD-4) and archive (status). */
-    public function update(Request $request, Session $session): JsonResponse
+    public function update(Request $request, Session $session, EventRecorder $recorder): JsonResponse
     {
         $this->authorizeAdmin($session, $request);
 
@@ -36,6 +37,7 @@ class SessionStateController
         }
 
         broadcast(new SessionStateUpdated($session))->toOthers();
+        $recorder->record($session, $action === 'archive' ? 'session_archived' : ($freeze ? 'session_frozen' : 'session_unfrozen'));
 
         return response()->json([
             'ok' => true,

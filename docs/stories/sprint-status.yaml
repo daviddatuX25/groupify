@@ -59,9 +59,9 @@ development_status:
   3-3-dissolve-groups: review
   3-4-freeze-unfreeze: review
   3-5-csv-export: review
-  3-6-activity-feed: ready-for-dev
+  3-6-activity-feed: review
   3-7-projection-hotkeys: review
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   # Epic 4 — Flexibility Systems
   epic-4: backlog

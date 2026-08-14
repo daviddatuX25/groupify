@@ -35,4 +35,12 @@ class Session extends Model
     {
         return $this->hasMany(Group::class, 'group_session_id');
     }
+
+    /**
+     * @return HasMany<SessionEvent, $this>
+     */
+    public function events(): HasMany
+    {
+        return $this->hasMany(SessionEvent::class, 'group_session_id');
+    }
 }

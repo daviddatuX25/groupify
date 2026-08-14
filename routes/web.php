@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminActionsController;
+use App\Http\Controllers\Admin\AdminActivityController;
 use App\Http\Controllers\Admin\AdminExportController;
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Controllers\Admin\SessionConfigController;
@@ -46,3 +47,5 @@ Route::post('/admin/sessions/{session}/dissolve', [AdminActionsController::class
     ->name('admin.dissolve');
 Route::get('/admin/sessions/{session}/export', [AdminExportController::class, 'csv'])
     ->name('admin.export');
+Route::get('/admin/sessions/{session}/activity', [AdminActivityController::class, 'index'])
+    ->name('admin.activity');
