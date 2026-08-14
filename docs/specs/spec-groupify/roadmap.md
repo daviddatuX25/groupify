@@ -34,7 +34,7 @@ Phasing preserves the full vision (locked decision: cut scope, never the vision)
 - Group quiz extension, custom roles
 - PWA shell
 - ~~Gated entry / guest lists~~ — **SHIPPED (phase-2 story D, 2026-08-14)**
-- Anonymous mode (random names, host retains identity — Slido/Blooket pattern)
+- ~~Anonymous mode~~ — **SHIPPED (phase-2 story E, 2026-08-14)**
 - Async sessions (reopen for absentees, deadline joins — Quizizz/Wordwall pattern)
 - Avatar/visual identity (Blooket-style) — optional engagement layer
 - Presenter remote control (Mentimote pattern)

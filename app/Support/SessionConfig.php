@@ -36,6 +36,7 @@ class SessionConfig implements Arrayable, JsonSerializable
                 'freeze' => false,
                 'auto_dissolve_minutes' => null,
                 'guest_list' => [],
+                'anonymous_mode' => false,
             ],
             'fields' => [],
             'perms' => [],

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Participant;
 use App\Models\Session;
 use App\Services\EventRecorder;
+use App\Support\RandomName;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -78,9 +79,15 @@ class JoinController
         }
 
         // AD-7: one seat per (session, device token) — same token rejoins its seat.
+        $anonymous = $session->config->rules()['anonymous_mode'] ?? false;
+
         $participant = Participant::query()->firstOrCreate(
             ['group_session_id' => $session->id, 'token' => $data['device_token']],
-            ['name' => $name, 'email' => $data['email'] ?? null],
+            [
+                'name' => $name,
+                'display_name' => $anonymous ? RandomName::generate() : null,
+                'email' => $data['email'] ?? null,
+            ],
         );
 
         if ($participant->wasRecentlyCreated) {

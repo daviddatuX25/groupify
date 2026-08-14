@@ -30,11 +30,13 @@ class SessionSnapshot
             ->where('status', 'active')
             ->pluck('participant_id');
 
+        $anonymous = $session->config->rules()['anonymous_mode'] ?? false;
+
         $pool = Participant::query()
             ->where('group_session_id', $session->id)
             ->whereNotIn('id', $activeMemberIds)
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'display_name']);
 
         return [
             'code' => $session->code,
@@ -42,7 +44,10 @@ class SessionSnapshot
             'dissolve_at' => $session->dissolve_at !== null ? Carbon::parse($session->dissolve_at)->toIso8601String() : null,
             'config' => $session->config->toArray(),
             'presence' => Participant::query()->where('group_session_id', $session->id)->count(),
-            'pool' => $pool->values(),
+            'pool' => $pool->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->display_name ?? $p->name,
+            ])->values(),
             'groups' => $groups->map(fn (Group $group) => [
                 'id' => $group->id,
                 'name' => $group->name,
@@ -55,12 +60,19 @@ class SessionSnapshot
                     ->with('participant')
                     ->where('status', 'active')
                     ->get()
-                    ->map(fn (Membership $m) => [
-                        'id' => $m->participant_id,
-                        'name' => $m->participant->name,
-                        'role' => $m->role,
-                    ])
-                    ->values(),
+                    ->map(function (Membership $m) use ($anonymous): array {
+                        /** @var array{id: int, name: string, real_name: string|null, role: string} $member */
+                        $member = [
+                            'id' => $m->participant_id,
+                            'name' => $m->participant->display_name ?? $m->participant->name,
+                            'real_name' => $anonymous ? $m->participant->name : null,
+                            'role' => $m->role,
+                        ];
+
+                        return $member;
+                    })
+                    ->values()
+                    ->all(),
                 'pending' => $group->memberships()
                     ->with('participant')
                     ->where('status', 'pending')
@@ -69,11 +81,13 @@ class SessionSnapshot
                         'id' => $m->participant_id,
                         'name' => $m->participant->name,
                     ])
-                    ->values(),
+                    ->values()
+                    ->all(),
             ])->values(),
             'me' => $me === null ? null : [
                 'id' => $me->id,
-                'name' => $me->name,
+                'name' => $me->display_name ?? $me->name,
+                'real_name' => $anonymous ? $me->name : null,
                 'pooled' => ! $activeMemberIds->contains($me->id),
             ],
         ];

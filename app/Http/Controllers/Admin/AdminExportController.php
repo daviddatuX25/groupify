@@ -22,6 +22,7 @@ class AdminExportController
         $this->authorizeAdmin($session, $request);
 
         $fields = collect($session->config->fields())->map(fn ($f) => (string) $f['name'])->values();
+        $anonymous = $session->config->rules()['anonymous_mode'] ?? false;
 
         $groupByParticipant = Membership::query()
             ->whereIn('group_id', $session->groups()->pluck('id'))
@@ -40,14 +41,14 @@ class AdminExportController
 
         $filename = 'groupify-'.$session->code.'.csv';
 
-        return response()->streamDownload(function () use ($participants, $groupByParticipant, $groups, $fields) {
+        return response()->streamDownload(function () use ($participants, $groupByParticipant, $groups, $fields, $anonymous) {
             $out = fopen('php://output', 'w');
 
             if ($out === false) {
                 throw new \RuntimeException('Could not open the output stream.');
             }
 
-            fputcsv($out, ['group', 'name', 'email', ...$fields->all()]);
+            fputcsv($out, ['group', 'name', ...($anonymous ? ['registered name'] : []), 'email', ...$fields->all()]);
 
             foreach ($participants as $p) {
                 $groupId = $groupByParticipant->get($p->id);
@@ -56,9 +57,12 @@ class AdminExportController
                 $values = $group !== null ? $group->field_values : [];
                 $row = [
                     $group !== null ? $group->name : '(pool)',
-                    $p->name,
+                    $p->display_name ?? $p->name,
                     $p->email ?? '',
                 ];
+                if ($anonymous) {
+                    array_splice($row, 2, 0, [$p->name]);
+                }
                 foreach ($fields as $field) {
                     $row[] = $values[$field] ?? '';
                 }
