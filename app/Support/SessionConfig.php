@@ -37,6 +37,8 @@ class SessionConfig implements Arrayable, JsonSerializable
                 'auto_dissolve_minutes' => null,
                 'guest_list' => [],
                 'anonymous_mode' => false,
+                'chat_enabled' => false,
+                'group_chat_mode' => 'open', // open | leader
             ],
             'fields' => [],
             'perms' => [],

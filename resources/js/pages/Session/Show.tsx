@@ -41,6 +41,9 @@ export default function Show({ session }: { session: SessionProps }) {
     const [flash, setFlash] = useState<{ groupId: number; kind: 'joined' | 'left' } | null>(null);
     const [gone, setGone] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
+    const [messages, setMessages] = useState<{ id: number; scope: string; author: string; body: string; at: string }[]>([]);
+    const [chatOpen, setChatOpen] = useState(false);
+    const [chatDraft, setChatDraft] = useState('');
     const [nowTick, setNowTick] = useState(Date.now());
     const prevStatus = useRef<string | null>(null);
 
@@ -50,6 +53,11 @@ export default function Show({ session }: { session: SessionProps }) {
     const data = board ?? session;
 
     const refetch = () => {
+        if (data.config.rules.chat_enabled) {
+            fetch(`/s/${data.code}/messages`, { headers: { 'X-Device-Token': deviceToken } })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((json) => { if (json) setMessages(json.messages); });
+        }
         fetch(`/api/sessions/${data.code}/board`, { headers: { 'X-Device-Token': deviceToken } })
             .then((r) => {
                 if (r.status === 404) {
@@ -68,6 +76,7 @@ export default function Show({ session }: { session: SessionProps }) {
         if (typeof window === 'undefined') return;
         const channel = echo().channel(`session.${data.code}`);
         CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));
+        channel.listen('MessageCreated', refetch);
         channel.listen('MembershipChanged', (e: { group_id: number; action: string }) => {
             if (e.action === 'joined' || e.action === 'left') {
                 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -415,6 +424,60 @@ export default function Show({ session }: { session: SessionProps }) {
                     })}
                 </div>
             </div>
+            {data.config.rules.chat_enabled && (
+                <section className="mx-auto mt-8 w-full max-w-6xl px-4">
+                    <button
+                        type="button"
+                        onClick={() => setChatOpen((o) => !o)}
+                        className="rounded-full border border-white/10 bg-slate-900 px-4 py-2 text-sm text-slate-300"
+                    >
+                        💬 Chat {chatOpen ? '▾' : '▸'}
+                    </button>
+                    {chatOpen && (
+                        <div className="mt-3 rounded-2xl border border-white/10 bg-slate-900 p-4">
+                            <div className="max-h-64 space-y-2 overflow-y-auto pr-2">
+                                {messages.length === 0 && <p className="text-sm text-slate-500">No messages yet.</p>}
+                                {messages.map((m) => (
+                                    <div key={m.id} className="text-sm">
+                                        <span className="font-semibold text-cyan-300">{m.author}</span>{' '}
+                                        <span className="text-slate-500">{new Date(m.at).toLocaleTimeString()}</span>
+                                        <p className="text-slate-200">{m.body}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            {meIn && (
+                                <div className="mt-3 flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Message your group…"
+                                        value={chatDraft}
+                                        onChange={(e) => setChatDraft(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && chatDraft.trim()) {
+                                                const body = chatDraft;
+                                                setChatDraft('');
+                                                void fetch(`/s/${data.code}/messages`, {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                        Accept: 'application/json',
+                                                        'X-Device-Token': deviceToken,
+                                                        'X-XSRF-TOKEN': decodeURIComponent(
+                                                            document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                                        ),
+                                                    },
+                                                    body: JSON.stringify({ scope: 'group', group_id: meIn.id, body }),
+                                                }).then((r) => { if (r.ok) refetch(); });
+                                            }
+                                        }}
+                                        className="flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </section>
+            )}
             <ComingNext />
         </main>
     );

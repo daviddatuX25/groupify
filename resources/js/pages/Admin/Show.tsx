@@ -37,6 +37,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [timerMin, setTimerMin] = useState('');
     const [guestListText, setGuestListText] = useState('');
     const [templateName, setTemplateName] = useState('');
+    const [announceDraft, setAnnounceDraft] = useState('');
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
@@ -435,6 +436,39 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                                 </div>
                             )),
                         )}
+                    </div>
+                )}
+
+                {data.config.rules.chat_enabled && (
+                    <div className="mt-8 rounded-2xl border border-white/10 bg-slate-900 p-4">
+                        <p className="text-sm font-bold uppercase tracking-wide text-cyan-400">Announcements</p>
+                        <div className="mt-2 flex gap-2">
+                            <input
+                                type="text"
+                                placeholder="Announce to everyone…"
+                                value={announceDraft}
+                                onChange={(e) => setAnnounceDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && announceDraft.trim()) {
+                                        const body = announceDraft;
+                                        setAnnounceDraft('');
+                                        void fetch(`/s/${data.code}/messages`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                Accept: 'application/json',
+                                                'X-Admin-Token': adminToken,
+                                                'X-XSRF-TOKEN': decodeURIComponent(
+                                                    document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                                ),
+                                            },
+                                            body: JSON.stringify({ scope: 'announcement', body }),
+                                        }).then((r) => { if (r.ok) refetch(); });
+                                    }
+                                }}
+                                className="flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                            />
+                        </div>
                     </div>
                 )}
 

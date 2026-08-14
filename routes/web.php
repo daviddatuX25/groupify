@@ -11,6 +11,7 @@ use App\Http\Controllers\BoardController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\JoinController;
+use App\Http\Controllers\MessageController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SessionPageController;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +35,8 @@ Route::get('/s/{session:code}', [SessionPageController::class, 'show'])->name('s
 Route::get('/api/sessions/{session:code}/board', [BoardController::class, 'show'])->name('board.show');
 
 // Participant group mutations (FR-4.1 … FR-4.3): device-token identity, transactional checks (AD-7)
+Route::get('/s/{session:code}/messages', [MessageController::class, 'index'])->name('messages.index');
+Route::post('/s/{session:code}/messages', [MessageController::class, 'store'])->name('messages.store');
 Route::post('/s/{session:code}/match-me', [GroupController::class, 'matchMe'])->name('match-me');
 Route::post('/s/{session:code}/groups', [GroupController::class, 'store'])->name('groups.store');
 Route::post('/s/{session:code}/groups/{group}/join', [GroupController::class, 'join'])->name('groups.join');
