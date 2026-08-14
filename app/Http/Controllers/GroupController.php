@@ -9,6 +9,7 @@ use App\Models\Membership;
 use App\Models\Participant;
 use App\Models\Session;
 use App\Services\EventRecorder;
+use App\Services\GroupLeadershipService;
 use App\Services\PermissionService;
 use App\Support\GroupNamer;
 use App\Support\SessionConfig;
@@ -130,16 +131,7 @@ class GroupController
             $membership->delete();
 
             if ($wasLeader) {
-                $next = Membership::query()
-                    ->where('group_id', $group->id)
-                    ->where('status', 'active')
-                    ->orderBy('id')
-                    ->first();
-
-                $group->update(['leader_id' => $next?->participant_id]);
-                if ($next !== null) {
-                    $next->update(['role' => 'leader']);
-                }
+                app(GroupLeadershipService::class)->rebalanceAfterRemoval($group);
             }
 
             return $wasLeader;

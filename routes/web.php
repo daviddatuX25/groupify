@@ -62,6 +62,8 @@ Route::post('/admin/sessions/{session}/quiz/start', [QuizController::class, 'sta
     ->name('admin.quiz.start');
 Route::post('/s/{session:code}/groups/{group}/quiz/answer', [QuizController::class, 'answer'])
     ->name('quiz.answer');
+Route::post('/admin/sessions/{session}/groups/{group}/leader', [AdminActionsController::class, 'transferLeadership'])
+    ->name('admin.groups.leader');
 Route::post('/admin/sessions/{session}/participants', [AdminActionsController::class, 'createParticipants'])
     ->name('admin.participants.store');
 Route::post('/admin/sessions/{session}/members/{participant}/ban', [AdminActionsController::class, 'ban'])

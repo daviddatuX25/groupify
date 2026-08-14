@@ -8,6 +8,7 @@ use App\Models\Membership;
 use App\Models\Participant;
 use App\Models\Session;
 use App\Services\EventRecorder;
+use App\Services\GroupLeadershipService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -118,8 +119,16 @@ class AdminActionsController
         $participant->update(['banned_at' => $banned ? now() : null]);
 
         if ($banned) {
-            Membership::query()->where('participant_id', $participant->id)->delete();
-            broadcast(new MembershipChanged($session, 0, 'left'))->toOthers();
+            $affectedGroups = Membership::query()
+                ->where('participant_id', $participant->id)
+                ->where('status', 'active')
+                ->get();
+
+            foreach ($affectedGroups as $membership) {
+                $membership->delete();
+                $result = app(GroupLeadershipService::class)->rebalanceAfterRemoval($membership->group);
+                broadcast(new MembershipChanged($session, $membership->group_id, $result === GroupLeadershipService::DISSOLVED ? 'dissolved' : 'left'))->toOthers();
+            }
         }
 
         $recorder->record($session, $banned ? 'participant_banned' : 'participant_unbanned', ['name' => $participant->name]);
@@ -174,6 +183,35 @@ class AdminActionsController
         $recorder->record($session, 'proxied_seats_created', ['count' => $created]);
 
         return response()->json(['ok' => true, 'created' => $created]);
+    }
+
+    /** Admin: transfer a group's leadership to an active member (CAP-10). */
+    public function transferLeadership(Request $request, Session $session, Group $group, EventRecorder $recorder): JsonResponse
+    {
+        $this->authorizeAdmin($session, $request);
+
+        abort_unless($group->group_session_id === $session->id, 404);
+
+        $participantId = (int) $request->validate(['participant_id' => ['required', 'integer']])['participant_id'];
+
+        $membership = Membership::query()
+            ->where('group_id', $group->id)
+            ->where('participant_id', $participantId)
+            ->where('status', 'active')
+            ->first();
+
+        if ($membership === null) {
+            throw ValidationException::withMessages(['participant_id' => 'Not an active member of this group.']);
+        }
+
+        Membership::query()->where('group_id', $group->id)->where('role', 'leader')->update(['role' => 'member']);
+        $membership->update(['role' => 'leader']);
+        $group->update(['leader_id' => $participantId]);
+
+        broadcast(new MembershipChanged($session, $group->id, 'leader_changed'))->toOthers();
+        $recorder->record($session, 'leadership_transferred', ['group_id' => $group->id]);
+
+        return response()->json(['ok' => true]);
     }
 
     /** Assign or clear a session custom role (CAP-7). */
@@ -238,7 +276,7 @@ class AdminActionsController
         return response()->json(['ok' => true, 'assigned' => $assigned]);
     }
 
-    /** Delete the member's active seat; transfer leadership if they led. */
+    /** Delete the member's active seat; transfer leadership if they led (CAP-10). */
     private function releaseSeat(Membership $membership): void
     {
         $group = $membership->group;
@@ -246,16 +284,7 @@ class AdminActionsController
         $membership->delete();
 
         if ($wasLeader) {
-            $next = Membership::query()
-                ->where('group_id', $group->id)
-                ->where('status', 'active')
-                ->orderBy('id')
-                ->first();
-
-            $group->update(['leader_id' => $next?->participant_id]);
-            if ($next !== null) {
-                $next->update(['role' => 'leader']);
-            }
+            app(GroupLeadershipService::class)->rebalanceAfterRemoval($group);
         }
     }
 }
