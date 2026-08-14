@@ -111,3 +111,58 @@ it('does not lock out after failed PIN attempts', function () {
         'device_token' => $this->token,
     ])->assertRedirect();
 });
+
+it('locks the session after 10 wrong PIN attempts', function () {
+    for ($i = 0; $i < 9; $i++) {
+        $this->postJson(route('join.store', $this->session), [
+            'pin' => '0000', 'name' => 'X'.$i, 'device_token' => (string) Str::uuid(),
+        ])->assertStatus(422)->assertJsonValidationErrors('pin');
+    }
+
+    // The 10th wrong attempt trips the lockout for further WRONG guesses.
+    $this->postJson(route('join.store', $this->session), [
+        'pin' => '0000', 'name' => 'X9', 'device_token' => (string) Str::uuid(),
+    ])->assertStatus(429);
+
+    // Knowing the PIN still joins (and clears the counter) — the limiter
+    // only throttles wrong guesses, never punishes the correct one.
+    $this->postJson(route('join.store', $this->session), [
+        'pin' => '4821', 'name' => 'Maya', 'device_token' => $this->token,
+    ])->assertRedirect();
+});
+
+it('keeps wrong-PIN lockout scoped to the offending session', function () {
+    for ($i = 0; $i < 10; $i++) {
+        $this->postJson(route('join.store', $this->session), [
+            'pin' => '0000', 'name' => 'X'.$i, 'device_token' => (string) Str::uuid(),
+        ])->assertStatus($i < 9 ? 422 : 429);
+    }
+
+    $other = Session::factory()->create(['pin' => '1111']);
+
+    $this->postJson(route('join.store', $other), [
+        'pin' => '1111', 'name' => 'Ana', 'device_token' => (string) Str::uuid(),
+    ])->assertRedirect();
+});
+
+it('clears the failed-PIN count on a successful join', function () {
+    for ($i = 0; $i < 5; $i++) {
+        $this->postJson(route('join.store', $this->session), [
+            'pin' => '0000', 'name' => 'X'.$i, 'device_token' => (string) Str::uuid(),
+        ])->assertStatus(422);
+    }
+
+    $this->postJson(route('join.store', $this->session), [
+        'pin' => '4821', 'name' => 'Maya', 'device_token' => $this->token,
+    ])->assertRedirect();
+
+    // Count was cleared — the lockout threshold applies to a fresh window.
+    for ($i = 0; $i < 9; $i++) {
+        $this->postJson(route('join.store', $this->session), [
+            'pin' => '0000', 'name' => 'Y'.$i, 'device_token' => (string) Str::uuid(),
+        ])->assertStatus(422);
+    }
+    $this->postJson(route('join.store', $this->session), [
+        'pin' => '4821', 'name' => 'Maya', 'device_token' => $this->token,
+    ])->assertRedirect();
+});

@@ -27,7 +27,7 @@ Three fresh-context adversarial layers (Blind Hunter backend, frontend hunter, s
 - SQLite config hardcoded `null` busy_timeout/journal_mode + DEFERRED transactions → env vars dead. Wired: WAL + busy_timeout 30000 + IMMEDIATE from env.
 - Quiz answers: `answer_index` unbounded (out-of-range 500), answering while frozen/archived allowed, duplicate-answer TOCTOU → unhandled unique-violation 500. Now bounded 422, status-guarded 404, race caught → 422.
 - Config merges used `array_replace_recursive` → numeric lists (guest list, fields, quiz questions) could never be shrunk. Replaced with `SessionConfig::deepMerge` (replace semantics for lists).
-- Join PIN brute-force: `throttle:20,1` on the join route.
+- Join PIN brute-force: replaced the per-IP `throttle:20,1` (it blocked legit mass joins from one NAT) with a per-session failed-PIN limiter — 10 wrong PINs / 5 min lock the session (later moved to the session-scoped RateLimiter; tested in JoinSessionTest).
 - Frontend: QR canvas blank after join-info toggle (callback ref), hotkeys firing while typing (editable-target guard), stale `chat_enabled` closure (refetch ref), device/admin tokens left in URL query strings (replaceState strip), silent fetch failures (error banner), shared chat draft across two inputs (split), overlapping snapshot refetches (sequence guard).
 
 ## Verified clean
