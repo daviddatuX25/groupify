@@ -7,6 +7,7 @@
 | Join throughput (25 concurrent) | 49-52 joins/s | n/a |
 | Realtime propagation (1 client, browser) | 180-700ms | CAP-3: 1000ms |
 | Realtime propagation (full parallel e2e) | 1093ms worst | 2000ms (test) |
+| Realtime propagation (dev stack, standalone) | 354ms | n/a (dev is single-threaded; e2e targets prod) |
 | Reverb fan-out to 100 sockets | p50 677ms, p95 679ms | CAP-3: 1000ms |
 
 Tooling: `scripts/load-test.sh [count] [base]`, `scripts/fanout.mjs <code> [count] [key]`
