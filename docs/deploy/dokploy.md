@@ -65,6 +65,13 @@ Manual checks:
 4. **Offline drill**: stop the container → banner within ~5s on clients; restart → resync, no duplicate seats.
 5. **CSV**: form groups with a topic, export, confirm the topic column.
 
+## Known cosmetic noise
+
+Supervisord logs `CRIT uncaptured python exception ... Illegal seek` bursts to
+docker logs. This is the well-known supervisord quirk with pipe stdout
+(`/dev/stdout`/`/proc/1/fd/1` are not seekable); the app is unaffected and
+nothing is lost — the app's own logs live in `storage/logs/laravel.log`.
+
 ## Backups (one-file DB)
 
 ```bash

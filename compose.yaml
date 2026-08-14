@@ -6,7 +6,7 @@ services:
     container_name: groupify-dev
     ports:
       - "8000:8000"   # Laravel (artisan serve)
-      - "8081:8080"   # Reverb WebSocket (host 8080 is taken by another process)
+      - "8082:8080"   # Reverb WebSocket (8081 is the prod stack; dev now coexists)
       - "5173:5173"   # Vite dev server
     volumes:
       - .:/var/www/html
@@ -18,7 +18,7 @@ services:
       REVERB_HOST: 0.0.0.0
       REVERB_PORT: 8080
       VITE_REVERB_HOST: localhost
-      VITE_REVERB_PORT: 8081
+      VITE_REVERB_PORT: 8082
       VITE_REVERB_SCHEME: http
     working_dir: /var/www/html
     restart: unless-stopped
