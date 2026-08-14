@@ -28,6 +28,7 @@ so that night-one is demonstrably working.
 - [x] CSV: 14 rows, dynamic "Chosen topic" column, pooled rows as (pool) (AC 4)
 - [x] Required-field block: covered by GroupMutationsTest (AC 3)
 - [x] Realtime cross-client live update: browser-verified in 2-5 (AC 6)
+- [x] Playwright e2e suite (tests/e2e, 6 tests) — participant + admin flows, realtime cross-client; all green against the production image (scripts/e2e.sh)
 - [ ] Server-kill failure drill (AC 5): banner + resync — deferred to the deployed environment
 - [ ] Full 20+ participant run on groupify.dxtechph.online after 6-3 deploy
 

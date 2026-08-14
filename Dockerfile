@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         | tar -xJ -C /usr/local --strip-components=1 \
     && curl -fsSL https://getcomposer.org/installer \
         | php -- --install-dir=/usr/local/bin --filename=composer \
+    && npm i -g @playwright/test >/dev/null 2>&1 \
+    && npx playwright install-deps chromium >/dev/null 2>&1 \
+    && npm rm -g @playwright/test >/dev/null 2>&1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html

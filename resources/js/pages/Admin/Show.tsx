@@ -60,20 +60,27 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
 
     // Persist token (AD-3) + live subscription (AD-6) + QR
     useEffect(() => {
-        if (typeof window === 'undefined') return;
-        window.localStorage.setItem('groupify.admin_token', adminToken);
-        const url = `${window.location.origin}/join/${data.code}`;
-        const canvas = document.querySelector('canvas');
-        if (canvas) {
-            void QRCode.toCanvas(canvas, url, { width: 160, margin: 1, color: { dark: '#0e1511', light: '#ffffff' } });
+        try {
+            if (typeof window === 'undefined') return;
+            window.localStorage.setItem('groupify.admin_token', adminToken);
+            const url = `${window.location.origin}/join/${data.code}`;
+            const canvas = document.querySelector('canvas');
+            if (canvas) {
+                void QRCode.toCanvas(canvas, url, { width: 160, margin: 1, color: { dark: '#0e1511', light: '#ffffff' } });
+            }
+            const channel = echo().channel(`session.${data.code}`);
+            CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));
+            setReady(true);
+            return () => {
+                CHANNEL_EVENTS.forEach((ev) => channel.stopListening(ev));
+                echo().leaveChannel(`session.${data.code}`);
+            };
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('[Admin/Show] effect failed', err);
+            window.__adminEffectError = String(err);
+            setReady(true); // render so the error is visible in the page
         }
-        const channel = echo().channel(`session.${data.code}`);
-        CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));
-        setReady(true);
-        return () => {
-            CHANNEL_EVENTS.forEach((ev) => channel.stopListening(ev));
-            echo().leaveChannel(`session.${data.code}`);
-        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.code, adminToken]);
 

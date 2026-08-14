@@ -17,6 +17,7 @@ config-level recipe, and everything here is locally tested via
    - Build type: **Dockerfile** with path `Dockerfile.prod`.
    - Build args (baked into the JS bundle — the browser's WS endpoint):
      - `VITE_REVERB_HOST=groupify.dxtechph.online`
+     - `VITE_REVERB_APP_KEY=<your REVERB_APP_KEY>`
      - `VITE_REVERB_PORT=443`
      - `VITE_REVERB_SCHEME=https`
 2. **Domain & SSL** — set `groupify.dxtechph.online`; Dokploy issues the
