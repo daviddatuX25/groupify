@@ -19,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+
+        // Home-server single-hop proxies (nginx in the container, Dokploy's Caddy
+        // in production): forwarded headers drive generated URLs + HTTPS scheme.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

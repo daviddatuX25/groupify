@@ -1,6 +1,10 @@
+---
+baseline_commit: 5f1dc16a297e395af354e3cd5ff222b3421a5b1c
+---
+
 # Story 6.3: Dokploy Deploy
 
-Status: ready-for-dev
+Status: in-progress (config complete + locally verified; live apply awaits user credentials)
 
 ## Story
 
@@ -11,35 +15,30 @@ so that the night-one success signal runs on a real public URL.
 ## Acceptance Criteria
 
 1. GIVEN the Dokploy project WHEN the deployment config is applied THEN the app is configured to serve at groupify.dxtechph.online with an SSL certificate (Let's Encrypt via Dokploy).
-2. GIVEN the Dokploy proxy WHEN Reverb WebSocket traffic arrives on the domain THEN upgrade requests are proxied correctly (upgrade headers, no buffering) so Echo connects.
-3. GIVEN the deployed app WHEN the deploy config is verified THEN /health returns OK and the server-status UX reports online — this acceptance is deployment-config-level; applying to live requires the user's Dokploy credentials.
+2. GIVEN the Dokploy proxy WHEN Reverb WebSocket traffic arrives on the domain THEN upgrade requests are proxied correctly so Echo connects.
+3. GIVEN the deployed app WHEN the deploy config is verified THEN /health returns OK and the server-status UX reports online. **Config-level acceptance: live apply requires the user's Dokploy credentials.**
 
 ## Tasks / Subtasks
 
-- [ ] Production container + Dokploy project (AC: 1)
-  - [ ] Production Dockerfile (build assets; run app + queue worker + Reverb per AD-10)
-  - [ ] Dokploy application configured for repo + branch with SQLite volume persistence
-  - [ ] Domain groupify.dxtechph.online + Let's Encrypt SSL via Dokploy
-- [ ] WebSocket proxy rules (AC: 2)
-  - [ ] Expose the Reverb port and configure Dokploy/Nginx upgrade proxying (HTTP/1.1 upgrade headers, no buffering)
-  - [ ] Verify an Echo handshake passes through the proxy on the deployed config
-- [ ] Deploy verification plan (AC: 3)
-  - [ ] Document exact verification steps: open URL, /health OK, join flow, offline-banner drill
-  - [ ] Note the prerequisite: live deployment requires the user's Dokploy credentials — acceptance is config-level, not a live-deploy claim
+- [x] Production container (AC: 1)
+  - [x] `Dockerfile.prod` — multi-stage (node assets → composer vendor → php:8.4-fpm + nginx + supervisord: nginx, php-fpm, queue:work, reverb:start, schedule:work)
+  - [x] `docker/prod/nginx.conf` — Laravel public/ + WS upgrade proxy /app → Reverb 127.0.0.1:8080 (HTTP/1.1 upgrade, buffering off) + HTTP_HOST passthrough + forwarded-proto
+  - [x] `docker/prod/entrypoint.sh` — clears stale dev discovery cache, package:discover, migrate, config/route cache
+  - [x] `docker/prod/supervisord-groupify.conf` — one-box envelope (AD-10)
+  - [x] `compose.prod.yaml` — local test rig with SQLite + storage volumes; image `groupify-app-prod` (separate from dev)
+  - [x] `docs/deploy/dokploy.md` — full recipe: app creation, build args (VITE_REVERB_HOST/PORT/SCHEME), env vars, volumes, Caddy WS snippet, verification plan
+- [ ] Live Dokploy apply (AC: 1, 2, 3) — requires user's Dokploy credentials + DNS
+  - [x] Domain/SSL/WS config steps documented (config-level)
+  - [ ] Actual domain apply + certificate issuance
+  - [ ] Live /health + Echo handshake + offline drill on groupify.dxtechph.online
 
 ## Dev Notes
 
-- AD-10: Dokploy deploy at groupify.dxtechph.online; SQLite file DB; database queue + one worker; Reverb on the same box; broadcast driver from env. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-10]
-- AD-11: /health must be reachable on the deployed box so the server-status UX works. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-11]
-- NFR-5: single-box deploy (Dokploy), SQLite, one queue worker; no external paid services. [Source: docs/prds/prd-groupify/prd.md#NFR-5]
-- CAP-9: a dead server is shown to every client within ~5s — the deployed box must expose /health and Reverb. [Source: docs/specs/spec-groupify/SPEC.md#CAP-9]
-- Reverb is bundled with Laravel 13 (keep patched — CVE-2026-23524 class). [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#Stack]
-- **Deploy prerequisite:** applying this to live Dokploy requires the user's credentials; acceptance is deployment-config-level, not a live-deploy claim.
-- Laravel 13 conventions: routes in routes/, controllers app/Http/Controllers, models app/Models, migrations database/migrations, Inertia pages resources/js/pages, components resources/js/components.
-
-### Project Structure Notes
-
-- Greenfield Laravel 13 app; scaffold story 6-1 establishes the layout — assume standard Laravel 13 + Inertia structure.
+- AD-10: single box, SQLite, one queue worker, Reverb same box. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-10]
+- Trusted proxies configured (`trustProxies(at: '*')`) — required behind nginx/Caddy for correct URL generation + HTTPS scheme.
+- Stale dev package-discovery cache (bootstrap/cache/packages.php with Pail) breaks `--no-dev` boots — cleared + regenerated in the entrypoint.
+- `/health` converted from a closure to `HealthController` so `route:cache` works in production.
+- Wayfinder vite plugin removed (beta; requires PHP in the assets stage; generated files gitignored).
 
 ### References
 
@@ -55,10 +54,27 @@ so that the night-one success signal runs on a real public URL.
 
 ### Agent Model Used
 
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
 ### Debug Log References
+
+- Pail discovery-cache boot crash with --no-dev vendor → entrypoint clears + regenerates
+- Wayfinder needs PHP in the node stage → plugin removed (unused typed routes)
+- fastcgi_param names must be HTTP_-prefixed; XFH injection conflicted with the client passthrough → minimal config: HTTP_HOST $http_host + HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto
+- Prod build overwrote the shared image tag → prod image named `groupify-app-prod`
 
 ### Completion Notes List
 
+- **Local production-image verification (full pass):** /health OK · SSR /new 200 · WS /app proxied · create session → redirect with port · join 302 · board 200 · create-group 200, on SQLite volumes.
+- Gates green (82 tests, 318 assertions).
+- Remaining: live Dokploy apply with the user's credentials (steps in docs/deploy/dokploy.md).
+
 ### File List
 
-- docs/stories/6-3-dokploy-deploy.md
+- Dockerfile.prod, compose.prod.yaml
+- docker/prod/{nginx.conf, supervisord-groupify.conf, entrypoint.sh}
+- docs/deploy/dokploy.md
+- app/Http/Controllers/HealthController.php
+- routes/web.php, bootstrap/app.php (trustProxies)
+- vite.config.ts (wayfinder removal), .dockerignore
+- docs/stories/6-3-dokploy-deploy.md (this record)

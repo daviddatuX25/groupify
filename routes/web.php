@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\SessionConfigController;
 use App\Http\Controllers\Admin\SessionStateController;
 use App\Http\Controllers\BoardController;
 use App\Http\Controllers\GroupController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SessionPageController;
@@ -15,8 +16,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
 
-// Heartbeat for the server-status UX (FR-8.2, AD-11)
-Route::get('/health', fn () => response()->json(['status' => 'ok']));
+// Heartbeat for the server-status UX (FR-8.2, AD-11) — controller-based so route caching works in prod
+Route::get('/health', [HealthController::class, 'index']);
 
 // Session lifecycle (FR-1.1): create page + store; creator lands in the admin panel
 Route::get('/new', [SessionController::class, 'new'])->name('sessions.new');
