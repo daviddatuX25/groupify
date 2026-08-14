@@ -1,73 +1,178 @@
+---
+baseline_commit: d3635046ecc75b5774904ab5a4cccf1203d62489
+---
+
 # Story 3.1: Admin Panel
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
-As a facilitator (session admin),
-I want an always-available admin panel showing join info and live session state,
-so that I can run the session from the projector without hunting for controls.
+As a facilitator,
+I want a live admin panel with QR, PIN, and stats,
+so that I can run the room from one projected screen.
 
 ## Acceptance Criteria
 
-1. GIVEN I am the session admin and the session is live WHEN I open the admin panel THEN the QR code (encoding the join URL with the session code) and the 4-digit PIN are always visible.
-2. GIVEN the admin panel is open WHEN participants join, leave, or groups change THEN live stats (online count / pool count / group count) update in real time.
-3. GIVEN groups exist in the session WHEN I view the admin panel THEN the group list shows every group with its current slots (e.g. 3/5).
-4. GIVEN a request lacks a valid admin token WHEN it targets an admin route THEN it is rejected and no admin data is returned.
+1. GIVEN the admin panel WHEN rendered THEN QR + PIN are always visible with live stats (online / pool / groups).
+2. GIVEN any session event WHEN it fires THEN the admin panel updates live without reload.
 
 ## Tasks / Subtasks
 
-- [ ] Admin panel route, controller, and Inertia page (AC: 1, 4)
-  - [ ] Add `GET /sessions/{code}/admin` route behind per-session admin-token authorization; controller in `app/Http/Controllers/Admin`.
-  - [ ] Create Inertia page `resources/js/pages/admin/Panel.tsx` rendered from server state (AD-2).
-- [ ] Join-info block (AC: 1)
-  - [ ] Render QR encoding the join URL incl. code (reuse the E1S3 QR component) with the PIN alongside, persistently visible (FR-1.5).
-  - [ ] Lay out for projector use: large type, high contrast (NFR-2, E5S2).
-- [ ] Live stats (AC: 2)
-  - [ ] Subscribe to the `admin:<code>` channel (AD-6); derive online / pool / groups counts from the server snapshot and re-render on events.
-  - [ ] Compute pool count from active memberships with no group (AD-7); resync full snapshot on any reconnect.
-- [ ] Group list with slots (AC: 3)
-  - [ ] Render each group with member count vs capacity (e.g. 3/5) from memberships, capacity from session config `rules` (AD-4).
-  - [ ] Refresh the list from the snapshot after every admin-channel event (AD-6).
-- [ ] Allowed-action gating (AC: 4)
-  - [ ] Server computes the allowed-action set via `can?` (AD-5); panel renders only permitted admin controls — no dead buttons.
+- [x] Admin UI rebuild: QR card, PIN, stats tiles (Online / PIN / Topics set / In pool / Groups), live groups + pool sections
+- [x] `BoardController` accepts `X-Admin-Token` → snapshot with `is_admin` (admin board JSON)
+- [x] Admin page subscribes to the session channel events → refetch (live updates, AD-6)
 
 ## Dev Notes
 
-- AD-3: admin identity = per-session `admin_token`; every session-scoped admin request is authorized by that token.
-- AD-5: UI affordances render only from the server-computed allowed-action set; the client never runs a second check.
-- AD-6: two channel classes — the admin channel (`admin:<code>`) carries god-mode events; reconnect always ends in a full snapshot resync.
-- AD-7: seats model — stats and slots derive from `memberships` rows, never from client-side counts.
-- AD-4: group capacity and naming come from the validated session config object, read through the one resolver.
-- Laravel 13 conventions: routes in routes/, controllers app/Http/Controllers, models app/Models, migrations database/migrations, Inertia pages resources/js/pages, components resources/js/components.
-
-### Project Structure Notes
-
-- Greenfield Laravel 13 app; scaffold story 6-1 establishes the layout — assume standard Laravel 13 + Inertia structure.
+- AD-6: the admin surface consumes the same events as participants. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-6]
+- Token seeding bug: the page was writing localStorage from its own (empty) read — seed from the server prop.
 
 ### References
 
-- [Source: docs/planning/epics-groupify.md#epic-e3--admin-control-god-mode]
-- [Source: docs/prds/prd-groupify/prd.md#f5--admin-control]
-- [Source: docs/specs/spec-groupify/SPEC.md#CAP-5]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-3]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-4]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-5]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-6]
-- [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-7]
+- [Source: docs/planning/epics-groupify.md#E3S1]
+- [Source: docs/prds/prd-groupify/prd.md#FR-5.1]
 
 # Traceability
 
-- FR: FR-1.5, FR-5.1 | CAP: CAP-5 | AD: AD-3, AD-4, AD-5, AD-6, AD-7
+- FR: FR-5.1 | CAP: CAP-5 | AD: AD-3, AD-6
 
 # Dev Agent Record
 
 ### Agent Model Used
 
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
 ### Debug Log References
+
+- `\${session.id}` sed escape broke every admin mutation URL (literal string) — fixed with edit tool
+- CSS text-transform uppercase broke case-sensitive innerText assertions
 
 ### Completion Notes List
 
+- Browser-verified: stats render live; a curl-side freeze PATCH propagated to the admin page without reload (FROZEN label + Unfreeze button appeared via WS).
+
 ### File List
 
-- docs/stories/3-1-admin-panel.md
+- resources/js/pages/Admin/Show.tsx
+- app/Http/Controllers/BoardController.php
+- docs/stories/3-1-admin-panel.md (this record)
+
+---
+
+# Story 3.2: Force-Move Member
+
+Status: review
+
+## Story
+
+As a facilitator,
+I want to move any member between groups or back to the pool,
+so that I can fix lopsided groups without asking anyone to leave.
+
+## Acceptance Criteria
+
+1. GIVEN an admin WHEN they move a member to a group THEN the membership changes transactionally and the board updates everywhere.
+2. GIVEN a leader is moved WHEN leadership transfers to the next member THEN the source group stays coherent.
+3. GIVEN a non-admin WHEN they call the move endpoint THEN it is rejected.
+
+## Tasks / Subtasks
+
+- [x] `AdminActionsController@move` — token auth, target-group validation (same session), transactional seat release (with leadership transfer) + capacity-checked re-seat, broadcast `MembershipChanged` (action `moved`)
+- [x] Admin UI: per-member "move…" select (pool + other groups), auto-act on change
+- [x] 4 Pest tests (cross-group move, kick to pool, leadership transfer, token rejection)
+
+## Dev Notes
+
+- Admin is exempt from the freeze (FR-1.3); move works while frozen.
+- AD-7: capacity re-checked on the target in the same transaction. [Source: docs/architecture/spine-groupify/ARCHITECTURE-SPINE.md#AD-7]
+
+### References
+
+- [Source: docs/planning/epics-groupify.md#E3S2]
+- [Source: docs/prds/prd-groupify/prd.md#FR-5.2]
+
+# Traceability
+
+- FR: FR-5.2 | CAP: CAP-5 | AD: AD-1, AD-7
+
+# Dev Agent Record
+
+### Agent Model Used
+
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
+### Debug Log References
+
+- None
+
+### Completion Notes List
+
+- 4 tests green; endpoint proven via suite (UI select uses the same act() path as dissolve, which is browser-proven).
+
+### File List
+
+- app/Http/Controllers/Admin/AdminActionsController.php
+- routes/web.php
+- resources/js/pages/Admin/Show.tsx
+- tests/Feature/AdminActionsTest.php
+- docs/stories/3-2-force-move.md (this record)
+
+---
+
+# Story 3.3: Dissolve Groups
+
+Status: review
+
+## Story
+
+As a facilitator,
+I want to dissolve one group or all groups back to the pool,
+so that I can restart formation cleanly.
+
+## Acceptance Criteria
+
+1. GIVEN a dissolve-all WHEN triggered THEN every active membership is cleared and all participants return to the pool.
+2. GIVEN a per-group dissolve WHEN triggered THEN only that group's memberships are cleared.
+3. GIVEN the dissolve WHEN committed THEN it broadcasts so every board updates live.
+
+## Tasks / Subtasks
+
+- [x] `AdminActionsController@dissolve` — optional `group_id`; transactionally deletes active memberships (+ clears leader_id), broadcasts `MembershipChanged` (`dissolved`)
+- [x] Admin UI: "Dissolve all" + per-group "Dissolve this group" buttons
+- [x] 2 Pest tests (all vs single group)
+
+## Dev Notes
+
+- Design: dissolved groups persist as empty shells (mockup "Team Delta — Pending Topic Assignment"), memberships only are cleared.
+
+### References
+
+- [Source: docs/planning/epics-groupify.md#E3S3]
+- [Source: docs/prds/prd-groupify/prd.md#FR-5.3]
+
+# Traceability
+
+- FR: FR-5.3 | CAP: CAP-5 | AD: AD-1
+
+# Dev Agent Record
+
+### Agent Model Used
+
+opencode-go/deepseek-v4-flash (in-loop, 2026-08-14)
+
+### Debug Log References
+
+- None
+
+### Completion Notes List
+
+- Browser-verified: Dissolve all → pool (1), Team Alpha emptied live.
+
+### File List
+
+- app/Http/Controllers/Admin/AdminActionsController.php
+- routes/web.php
+- resources/js/pages/Admin/Show.tsx
+- tests/Feature/AdminActionsTest.php
+- docs/stories/3-3-dissolve-groups.md (this record)

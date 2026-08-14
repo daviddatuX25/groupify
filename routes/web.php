@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminActionsController;
 use App\Http\Controllers\Admin\AdminPanelController;
 use App\Http\Controllers\Admin\SessionConfigController;
 use App\Http\Controllers\Admin\SessionStateController;
@@ -38,3 +39,7 @@ Route::patch('/admin/sessions/{session}/state', [SessionStateController::class, 
     ->name('admin.sessions.state.update');
 Route::delete('/admin/sessions/{session}', [SessionStateController::class, 'destroy'])
     ->name('admin.sessions.destroy');
+Route::post('/admin/sessions/{session}/members/{participant}/move', [AdminActionsController::class, 'move'])
+    ->name('admin.members.move');
+Route::post('/admin/sessions/{session}/dissolve', [AdminActionsController::class, 'dissolve'])
+    ->name('admin.dissolve');

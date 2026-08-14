@@ -54,9 +54,9 @@ development_status:
 
   # Epic 3 — Admin Control
   epic-3: backlog
-  3-1-admin-panel: ready-for-dev
-  3-2-force-move: ready-for-dev
-  3-3-dissolve-groups: ready-for-dev
+  3-1-admin-panel: review
+  3-2-force-move: review
+  3-3-dissolve-groups: review
   3-4-freeze-unfreeze: ready-for-dev
   3-5-csv-export: ready-for-dev
   3-6-activity-feed: ready-for-dev
