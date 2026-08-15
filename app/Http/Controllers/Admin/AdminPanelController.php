@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Models\Session;
 use App\Services\SessionSnapshot;
+use App\Support\RoleDefaults;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,6 +34,10 @@ class AdminPanelController
                 'groups' => $board['groups'],
                 // The client persists this and sends it as X-Admin-Token for admin actions (AD-3).
                 'admin_token' => $session->admin_token,
+                // Permissions editor (flexibility-model.md §1): the action list
+                // and the system defaults the matrix renders against.
+                'perm_actions' => array_keys(RoleDefaults::MATRIX),
+                'perm_defaults' => RoleDefaults::MATRIX,
             ],
         ]);
     }

@@ -145,6 +145,7 @@ class AdminActionsController
     public function createParticipants(Request $request, Session $session, EventRecorder $recorder): JsonResponse
     {
         $this->authorizeAdmin($session, $request);
+        abort_unless($session->config->hasExtension('proxy'), 404);
 
         $raw = $request->validate([
             'names' => ['required', 'array', 'max:200'],

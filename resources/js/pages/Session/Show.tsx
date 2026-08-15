@@ -27,7 +27,7 @@ type SessionProps = {
     pool: { id: number; name: string }[];
     groups: Group[];
     me: Me;
-    config: { rules: Record<string, unknown>; fields: Field[] };
+    config: { rules: Record<string, unknown>; fields: Field[]; extensions?: string[] };
 };
 
 const CHANNEL_EVENTS = ['SessionConfigUpdated', 'SessionStateUpdated', 'GroupCreated', 'SessionDeleted'];
@@ -338,6 +338,7 @@ export default function Show({ session }: { session: SessionProps }) {
                             <div className="flex flex-wrap items-center gap-2.5">
                                 {canMutate && data.me.pooled && (
                                     <>
+                                        {(data.config.extensions ?? []).includes('match_me') && (
                                         <button
                                             type="button"
                                             onClick={() => mutate(`/s/${data.code}/match-me`)}
@@ -346,6 +347,7 @@ export default function Show({ session }: { session: SessionProps }) {
                                             <span className="material-symbols-outlined text-[16px]">bolt</span>
                                             <span>Match me</span>
                                         </button>
+                                        )}
                                         <button
                                             type="button"
                                             onClick={() => setCreating((c) => !c)}

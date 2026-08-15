@@ -2,6 +2,7 @@
 
 use App\Models\Participant;
 use App\Models\Session;
+use App\Support\SessionConfig;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -12,6 +13,7 @@ beforeEach(function () {
     $this->withoutMiddleware(PreventRequestForgery::class);
 
     $this->session = Session::factory()->create();
+    $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), ['extensions' => ['proxy']])]);
     $this->adminHeaders = ['X-Admin-Token' => $this->session->admin_token, 'Accept' => 'application/json'];
 });
 

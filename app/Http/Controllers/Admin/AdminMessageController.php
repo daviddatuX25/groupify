@@ -44,6 +44,7 @@ class AdminMessageController
 
     public function decide(Request $request, Session $session, SessionMessage $message): JsonResponse
     {
+        abort_unless($session->config->hasExtension('moderation'), 404);
         $this->authorizeAdmin($session, $request);
 
         abort_unless($message->group_session_id === $session->id, 404);

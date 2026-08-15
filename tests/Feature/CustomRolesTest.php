@@ -15,6 +15,7 @@ beforeEach(function () {
     $this->session = Session::factory()->create();
     $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), [
         'rules' => ['chat_enabled' => true],
+        'extensions' => ['announcements'],
         'roles' => ['co-host' => ['announce']],
     ])]);
 

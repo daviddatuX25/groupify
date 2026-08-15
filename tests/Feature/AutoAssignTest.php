@@ -4,6 +4,7 @@ use App\Models\Group;
 use App\Models\Membership;
 use App\Models\Participant;
 use App\Models\Session;
+use App\Support\SessionConfig;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -13,6 +14,7 @@ beforeEach(function () {
     $this->withoutMiddleware(PreventRequestForgery::class);
 
     $this->session = Session::factory()->create();
+    $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), ['extensions' => ['match_me']])]);
 });
 
 it('auto-distributes all pooled participants into groups with space', function () {

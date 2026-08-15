@@ -1,0 +1,194 @@
+import { useState } from 'react';
+
+type Props = {
+    sessionId: number;
+    code: string;
+    adminToken: string;
+    actions: string[];
+    defaults: Record<string, Record<string, boolean>>;
+    perms: Record<string, Record<string, boolean>>;
+    roles: Record<string, string[]>;
+    onSaved: () => void;
+};
+
+const ROLES = ['admin', 'leader', 'member'] as const;
+const ROLE_LABEL: Record<(typeof ROLES)[number], string> = {
+    admin: 'Admin',
+    leader: 'Leader',
+    member: 'Member',
+};
+
+/**
+ * Permission gates assignment (flexibility-model.md §1): the action × role
+ * matrix overrides the system defaults, plus custom session roles.
+ */
+export default function PermsEditor({ sessionId, code, adminToken, actions, defaults, perms, roles, onSaved }: Props) {
+    const [overrides, setOverrides] = useState<Record<string, Record<string, boolean>>>({ ...perms });
+    const [roleName, setRoleName] = useState('');
+    const [roleActions, setRoleActions] = useState('');
+
+    const effective = (action: string, role: string): boolean =>
+        overrides[action]?.[role] ?? defaults[action]?.[role] ?? false;
+
+    const toggle = (action: string, role: string) => {
+        const current = effective(action, role);
+        setOverrides((o) => {
+            const next = { ...o };
+            next[action] = { ...(next[action] ?? {}), [role]: !current };
+            return next;
+        });
+    };
+
+    const savePerms = () => {
+        const xsrf = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1];
+        void fetch(`/admin/sessions/${sessionId}/config`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Admin-Token': adminToken,
+                ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : {}),
+            },
+            body: JSON.stringify({ perms: overrides }),
+        }).then((r) => {
+            if (r.ok) onSaved();
+        });
+    };
+
+    const defineRole = () => {
+        const name = roleName.trim();
+        const actionsList = roleActions.split(',').map((a) => a.trim()).filter(Boolean);
+        if (!name) return;
+        const xsrf = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1];
+        void fetch(`/admin/sessions/${sessionId}/config`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Admin-Token': adminToken,
+                ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : {}),
+            },
+            body: JSON.stringify({ roles: { ...roles, [name]: actionsList } }),
+        }).then((r) => {
+            if (r.ok) {
+                setRoleName('');
+                setRoleActions('');
+                onSaved();
+            }
+        });
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* ---- Permission matrix ---- */}
+            <section className="glass-card rounded-2xl p-5 shadow-xl">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div>
+                        <h3 className="font-display text-base font-bold text-on-surface">Permission Gates</h3>
+                        <p className="mt-0.5 text-xs text-on-surface-variant">
+                            Toggle what each role may do. Overrides the system defaults for this session.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={savePerms}
+                        className="rounded-xl bg-primary-container px-4 py-2 font-display text-xs font-bold text-on-primary-container shadow-[0_0_15px_rgba(78,222,61,0.25)] hover:brightness-110"
+                    >
+                        Save Permissions
+                    </button>
+                </div>
+
+                <div className="mt-4 overflow-x-auto">
+                    <table className="w-full min-w-[480px] text-left">
+                        <thead>
+                            <tr className="border-b border-white/10">
+                                <th className="pb-2 pr-3 font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                                    Action
+                                </th>
+                                {ROLES.map((r) => (
+                                    <th key={r} className="pb-2 text-center font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">
+                                        {ROLE_LABEL[r]}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {actions.map((action) => (
+                                <tr key={action} className="border-b border-white/5">
+                                    <td className="py-2.5 pr-3 font-mono text-xs text-on-surface">{action}</td>
+                                    {ROLES.map((role) => {
+                                        const on = effective(action, role);
+                                        return (
+                                            <td key={role} className="py-2.5 text-center">
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={on}
+                                                    aria-label={`${action} for ${ROLE_LABEL[role]}`}
+                                                    onClick={() => toggle(action, role)}
+                                                    className={`relative h-5 w-9 rounded-full transition-colors ${
+                                                        on ? 'bg-primary-container' : 'bg-surface-variant'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+                                                            on ? 'left-4' : 'left-0.5'
+                                                        }`}
+                                                    />
+                                                </button>
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {/* ---- Custom session roles ---- */}
+            <section className="glass-card rounded-2xl p-5 shadow-xl">
+                <div className="border-b border-white/10 pb-3">
+                    <h3 className="font-display text-base font-bold text-on-surface">Custom Roles</h3>
+                    <p className="mt-0.5 text-xs text-on-surface-variant">
+                        Session-scoped roles with their own action sets (e.g. a co-host who can announce). Assign them
+                        to participants from the pool chips below the board.
+                    </p>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                    <input
+                        type="text"
+                        placeholder="role name"
+                        value={roleName}
+                        onChange={(e) => setRoleName(e.target.value)}
+                        className="w-36 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
+                    />
+                    <input
+                        type="text"
+                        placeholder={`actions (comma): ${actions.slice(0, 3).join(', ')}…`}
+                        value={roleActions}
+                        onChange={(e) => setRoleActions(e.target.value)}
+                        className="w-72 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
+                    />
+                    <button
+                        type="button"
+                        onClick={defineRole}
+                        className="rounded-xl border border-white/10 bg-surface-variant/40 px-4 py-2 font-sans text-xs font-semibold text-on-surface hover:bg-surface-variant"
+                    >
+                        Define Role
+                    </button>
+                    {Object.entries(roles).map(([name, roleActionList]) => (
+                        <span key={name} className="rounded-full border border-secondary/30 bg-surface-container px-3 py-1 font-mono text-xs text-secondary">
+                            {name}: {roleActionList.join(', ')}
+                        </span>
+                    ))}
+                </div>
+
+                <p className="mt-4 font-mono text-[10px] uppercase tracking-widest text-on-surface-variant/60">
+                    Participants on this session: {code}
+                </p>
+            </section>
+        </div>
+    );
+}

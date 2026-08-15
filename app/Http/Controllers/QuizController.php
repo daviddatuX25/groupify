@@ -60,6 +60,7 @@ class QuizController extends Controller
     public function save(Request $request, Session $session): JsonResponse
     {
         $this->authorizeAdmin($session, $request);
+        abort_unless($session->config->hasExtension('quiz'), 404);
 
         $data = $request->validate([
             'questions' => ['required', 'array', 'max:50'],
@@ -81,6 +82,7 @@ class QuizController extends Controller
     public function start(Request $request, Session $session): JsonResponse
     {
         $this->authorizeAdmin($session, $request);
+        abort_unless($session->config->hasExtension('quiz'), 404);
 
         if ($session->config->quiz() === []) {
             throw ValidationException::withMessages(['questions' => 'Define questions before starting the quiz.']);
@@ -101,6 +103,8 @@ class QuizController extends Controller
     /** Group leader answers the current question; auto-grades and advances (CAP-8). */
     public function answer(Request $request, Session $session, Group $group): JsonResponse
     {
+        abort_unless($session->config->hasExtension('quiz'), 404);
+
         $token = $request->header('X-Device-Token', $request->query('device_token', ''));
         $me = $token === '' ? null : Participant::query()
             ->where('group_session_id', $session->id)

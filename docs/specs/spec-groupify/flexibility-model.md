@@ -67,8 +67,23 @@ Surfaces: group create/edit form · board card · board search · CSV export.
 
 ### Extension contract
 An extension = hooks on session events + own screens + own data. It never
-mutates core grouping logic. Enabling is per-session (`session_extensions: []`),
-so one session can run with chat+quiz while another runs bare.
+mutates core grouping logic. Enabling is per-session (`extensions: []`), so one
+session can run with chat+quiz while another runs bare. Implemented keys
+(ExtensionRegistry, 2026-08-15): `quiz`, `match_me`, `proxy`, `announcements`,
+`moderation`. **Plugins are a distinct future layer**: third-party modules on
+the same slot contract; no plugin registry exists yet — the admin Plugins tab
+is a read-only shelf describing the seam.
+
+### Admin panel surface map (shipped, 2026-08-15)
+
+| Tab | Contents | Visibility |
+|---|---|---|
+| **Live Grid** (core) | QR join card, PIN, presence, Freeze/Dissolve/Export, auto-dissolve timer, guest list, stat tiles, live groups grid, pool bar (roles + ban + auto-distribute) | always |
+| **Configuration** (core) | Session Rules editor (group size, join mode, naming, anonymous, chat modes, freeze) + Group Fields editor (add/remove/attribute) | always |
+| **Permissions** (core) | action × role matrix (overrides system defaults) + custom session roles (define + assign) | always |
+| **Extensions** (session-toggled) | shelf of implemented modules; enabled modules' panels render here (quiz builder, proxy importer, announcements, moderation queue) | per-session toggle |
+| **Plugins** (future) | read-only coming-soon shelf (Spin the Wheel, Live Polls, …) | informational |
+| **Templates & Activity** (core) | config templates + event log | always |
 
 ### Session config object (one source of truth)
 ```
@@ -80,5 +95,6 @@ session {
 }
 ```
 Every UI action → `can?(action, role)`; every card render → `fields`; extension
-slots read session events. This object is the night-one data model — the full
-matrix UI and extension shelf are later surface, not later architecture.
+slots read session events. This object is the data model — the matrix UI,
+extension shelf, and configuration interface are shipped surfaces (above), not
+later architecture.

@@ -75,6 +75,7 @@ class SessionConfig implements Arrayable, JsonSerializable
         return [
             'rules' => $rules,
             'fields' => $this->data['fields'] ?? [],
+            'extensions' => $this->data['extensions'] ?? [],
         ];
     }
 
@@ -154,6 +155,12 @@ class SessionConfig implements Arrayable, JsonSerializable
     public function quiz(): array
     {
         return $this->data['quiz']['questions'] ?? [];
+    }
+
+    /** A session-toggled module (flexibility-model.md: Extensions). */
+    public function hasExtension(string $name): bool
+    {
+        return in_array($name, $this->data['extensions'] ?? [], true);
     }
 
     /** @return array<int, string> */

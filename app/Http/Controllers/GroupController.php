@@ -146,6 +146,7 @@ class GroupController
     /** Match me: auto-assign the pooled participant to the least-full group (CAP-12). */
     public function matchMe(Request $request, Session $session, EventRecorder $recorder): JsonResponse
     {
+        abort_unless($session->config->hasExtension('match_me'), 404);
         $me = $this->participant($request, $session);
         $this->assertMutable($session);
         $this->assertPooled($me);

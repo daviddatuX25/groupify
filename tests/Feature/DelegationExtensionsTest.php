@@ -16,6 +16,7 @@ beforeEach(function () {
     $this->session = Session::factory()->create();
     $this->me = Participant::factory()->create(['group_session_id' => $this->session->id]);
     $this->headers = ['X-Device-Token' => $this->me->token, 'Accept' => 'application/json'];
+    $this->adminHeaders = ['X-Admin-Token' => $this->session->admin_token, 'Accept' => 'application/json'];
 });
 
 it('lets a leader set their group size within session bounds (default delegation)', function () {
@@ -80,6 +81,18 @@ it('rejects extensions until a module ships', function () {
     )->assertOk();
 });
 
-it('exposes the extension registry with no modules shipped yet', function () {
-    expect(app(ExtensionRegistry::class)->registered())->toBe([]);
+it('exposes the registry of implemented session-toggled extensions', function () {
+    expect(app(ExtensionRegistry::class)->registered())->toBe([
+        'quiz',
+        'match_me',
+        'proxy',
+        'announcements',
+        'moderation',
+    ]);
+});
+
+it('rejects enabling an unregistered extension key', function () {
+    $this->putJson(route('admin.sessions.config.update', $this->session), [
+        'extensions' => ['definitely-not-a-module'],
+    ], $this->adminHeaders)->assertStatus(422);
 });

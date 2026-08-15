@@ -16,7 +16,8 @@ beforeEach(function () {
     $this->withoutMiddleware(PreventRequestForgery::class);
 
     $this->session = Session::factory()->create();
-    $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), [
+    $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), ['extensions' => ['announcements', 'moderation']])]);
+    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), [
         'rules' => ['chat_enabled' => true],
     ])]);
 
@@ -70,7 +71,7 @@ it('lets group members chat in their group only', function () {
 });
 
 it('enforces leader-only group chat when configured', function () {
-    $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), [
+    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), [
         'rules' => ['chat_enabled' => true, 'group_chat_mode' => 'leader'],
     ])]);
 
@@ -102,7 +103,7 @@ it('indexes announcements for everyone and group chat only for members', functio
 });
 
 it('disables chat entirely when the flag is off', function () {
-    $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), [
+    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), [
         'rules' => ['chat_enabled' => false],
     ])]);
 
@@ -134,7 +135,7 @@ it('lets any participant post to the global hub visible to everyone', function (
 });
 
 it('mutes global chat writes when configured', function () {
-    $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), [
+    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), [
         'rules' => ['chat_enabled' => true, 'global_chat_mode' => 'muted'],
     ])]);
 
@@ -147,7 +148,7 @@ it('mutes global chat writes when configured', function () {
 });
 
 it('queues global posts for moderation and lets the admin approve or reject', function () {
-    $this->session->update(['config' => array_replace_recursive(SessionConfig::defaults(), [
+    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), [
         'rules' => ['chat_enabled' => true, 'global_chat_mode' => 'moderated'],
     ])]);
 

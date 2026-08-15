@@ -1,5 +1,9 @@
 import { echo } from '@laravel/echo-react';
 import ComingNext from '@/components/ComingNext';
+import ConfigEditor from './ConfigEditor';
+import ExtensionsShelf from './ExtensionsShelf';
+import PermsEditor from './PermsEditor';
+import PluginsShelf from './PluginsShelf';
 import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
 import { useEffect, useState } from 'react';
@@ -29,7 +33,17 @@ type Board = {
 
 const CHANNEL_EVENTS = ['SessionConfigUpdated', 'SessionStateUpdated', 'GroupCreated', 'MembershipChanged', 'SessionDeleted'];
 
-export default function Show({ session }: { session: Board & { id: number; pin: string; admin_token?: string } }) {
+export default function Show({
+    session,
+}: {
+    session: Board & {
+        id: number;
+        pin: string;
+        admin_token?: string;
+        perm_actions?: string[];
+        perm_defaults?: Record<string, Record<string, boolean>>;
+    };
+}) {
     const [board, setBoard] = useState<Board | null>(null);
     const [ready, setReady] = useState(false);
     const [showJoinInfo, setShowJoinInfo] = useState(true);
@@ -39,14 +53,13 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [guestListText, setGuestListText] = useState('');
     const [templateName, setTemplateName] = useState('');
     const [announceDraft, setAnnounceDraft] = useState('');
-    const [roleName, setRoleName] = useState('');
     const [proxyNames, setProxyNames] = useState('');
     const [quizDraft, setQuizDraft] = useState([{ q: '', options: ['', '', '', ''], answer: 0, points: 10 }]);
-    const [roleActions, setRoleActions] = useState('');
     const [modQueue, setModQueue] = useState<{ id: number; scope: string; author: string; body: string }[]>([]);
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
     const [liveCount, setLiveCount] = useState<number | null>(null);
     const [joinBase, setJoinBase] = useState('');
+    const [tab, setTab] = useState<'grid' | 'config' | 'perms' | 'extensions' | 'plugins' | 'templates'>('grid');
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
     if (typeof window !== 'undefined' && session.admin_token) {
@@ -197,6 +210,11 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
             .catch(() => setActionError('Network error — try again.'));
     };
 
+    const toggleExtension = (key: string, enabled: boolean) => {
+        const current = ((data.config.extensions as string[] | undefined) ?? []).filter((e) => e !== key);
+        act(`/admin/sessions/${session.id}/config`, { extensions: enabled ? [...current, key] : current });
+    };
+
     // 3-7: projection hotkeys — i toggles join info, h hides the board (Mentimeter pattern)
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -234,38 +252,35 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                     </div>
 
                     <nav className="flex flex-col gap-1.5 pt-2">
-                        <button
-                            type="button"
-                            onClick={() => setShowBoard(true)}
-                            className="flex items-center gap-3 rounded-xl bg-surface-variant/40 p-3 font-sans text-sm font-semibold text-secondary shadow-[0_0_12px_rgba(76,215,246,0.2)] transition-all"
-                        >
-                            <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                                grid_view
-                            </span>
-                            <span>Live Grid</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowJoinInfo((v) => !v)}
-                            className="flex items-center gap-3 rounded-xl p-3 font-sans text-sm text-on-surface-variant transition-all hover:bg-surface-variant/30 hover:text-on-surface"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">qr_code_scanner</span>
-                            <span>{showJoinInfo ? 'Hide Join Info' : 'Show Join Info'}</span>
-                        </button>
-                        <a
-                            href="/new"
-                            className="flex items-center gap-3 rounded-xl p-3 font-sans text-sm text-on-surface-variant transition-all hover:bg-surface-variant/30 hover:text-on-surface"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">add_circle</span>
-                            <span>New Session</span>
-                        </a>
-                        <a
-                            href="/"
-                            className="flex items-center gap-3 rounded-xl p-3 font-sans text-sm text-on-surface-variant transition-all hover:bg-surface-variant/30 hover:text-on-surface"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">home</span>
-                            <span>Home</span>
-                        </a>
+                        {(
+                            [
+                                ['grid', 'grid_view', 'Live Grid'],
+                                ['config', 'tune', 'Configuration'],
+                                ['perms', 'admin_panel_settings', 'Permissions'],
+                                ['extensions', 'extension', 'Extensions'],
+                                ['plugins', 'widgets', 'Plugins'],
+                                ['templates', 'history', 'Templates & Activity'],
+                            ] as const
+                        ).map(([key, icon, label]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setTab(key)}
+                                className={`flex items-center gap-3 rounded-xl p-3 font-sans text-sm transition-all ${
+                                    tab === key
+                                        ? 'bg-surface-variant/40 font-semibold text-secondary shadow-[0_0_12px_rgba(76,215,246,0.2)]'
+                                        : 'text-on-surface-variant hover:bg-surface-variant/30 hover:text-on-surface'
+                                }`}
+                            >
+                                <span
+                                    className="material-symbols-outlined text-[20px]"
+                                    style={tab === key ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                                >
+                                    {icon}
+                                </span>
+                                <span>{label}</span>
+                            </button>
+                        ))}
                     </nav>
                 </div>
 
@@ -317,8 +332,33 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                         </div>
                     </header>
 
+                    {/* Mobile tab bar */}
+                    <nav className="mb-4 flex items-center gap-1 overflow-x-auto rounded-xl border border-white/10 bg-surface-container-low/60 p-1 lg:hidden hide-scrollbar">
+                        {(
+                            [
+                                ['grid', 'Live Grid'],
+                                ['config', 'Config'],
+                                ['perms', 'Perms'],
+                                ['extensions', 'Extensions'],
+                                ['plugins', 'Plugins'],
+                                ['templates', 'History'],
+                            ] as const
+                        ).map(([key, label]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setTab(key)}
+                                className={`shrink-0 rounded-lg px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                                    tab === key ? 'bg-secondary/20 text-secondary' : 'text-on-surface-variant'
+                                }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </nav>
+
                     {/* Bento Header Area (QR + Controls + Stat Tiles) */}
-                    {showJoinInfo && (
+                    {showJoinInfo && tab === 'grid' && (
                         <section className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-12">
                             {/* QR Card */}
                             <div className="glass-card flex flex-col items-center justify-center gap-3.5 rounded-2xl p-5 shadow-2xl backdrop-blur-xl md:col-span-4 lg:col-span-3">
@@ -495,7 +535,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                     )}
 
                     {/* Live Groups Grid */}
-                    {showBoard && (
+                    {showBoard && tab === 'grid' && (
                         <>
                             <div className="mb-4 flex items-center justify-between">
                                 <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-secondary">
@@ -686,10 +726,18 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                                     </div>
                                 </section>
                             )}
+                        </>
+                    )}
 
+                    {/* ==== Extensions tab ==== */}
+                    {tab === 'extensions' && (
+                        <ExtensionsShelf
+                            extensions={(data.config.extensions ?? []) as string[]}
+                            onToggle={toggleExtension}
+                        >
                             {/* Announcements Module */}
-                            {data.config.rules.chat_enabled && (
-                                <section className="glass-card mt-8 rounded-2xl p-5">
+                            {(data.config.extensions ?? []).includes('announcements') && (
+                                <section className="glass-card mt-6 rounded-2xl p-5">
                                     <p className="font-mono text-xs font-bold uppercase tracking-widest text-secondary">
                                         Broadcast Announcement
                                     </p>
@@ -724,6 +772,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                             )}
 
                             {/* Quiz Builder Module */}
+                            {(data.config.extensions ?? []).includes('quiz') && (
                             <section className="glass-card mt-8 rounded-2xl p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
                                     <div>
@@ -846,8 +895,10 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                                     </div>
                                 )}
                             </section>
+                            )}
 
                             {/* Proxy Importer Module */}
+                            {(data.config.extensions ?? []).includes('proxy') && (
                             <section className="glass-card mt-8 rounded-2xl p-5">
                                 <h3 className="font-display text-base font-bold text-on-surface">Proxy Seat Importer</h3>
                                 <p className="mt-0.5 text-xs text-on-surface-variant">
@@ -874,60 +925,10 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                                     </button>
                                 </div>
                             </section>
-
-                            {/* Custom Roles Module */}
-                            <section className="glass-card mt-8 flex flex-wrap items-center gap-3 rounded-2xl p-5">
-                                <span className="font-mono text-xs font-bold uppercase tracking-widest text-secondary">
-                                    Custom Roles
-                                </span>
-                                <input
-                                    type="text"
-                                    placeholder="role name"
-                                    value={roleName}
-                                    onChange={(e) => setRoleName(e.target.value)}
-                                    className="w-32 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-1.5 text-xs text-on-surface outline-none focus:border-secondary"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="actions (comma-separated)"
-                                    value={roleActions}
-                                    onChange={(e) => setRoleActions(e.target.value)}
-                                    className="w-56 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-1.5 text-xs text-on-surface outline-none focus:border-secondary"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const name = roleName.trim();
-                                        const actions = roleActions.split(',').map((a) => a.trim()).filter(Boolean);
-                                        if (!name) return;
-                                        const roles = (data.config.roles ?? {}) as Record<string, string[]>;
-                                        roles[name] = actions;
-                                        void fetch(`/admin/sessions/${session.id}/config`, {
-                                            method: 'PUT',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                Accept: 'application/json',
-                                                'X-Admin-Token': adminToken,
-                                                'X-XSRF-TOKEN': decodeURIComponent(
-                                                    document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
-                                                ),
-                                            },
-                                            body: JSON.stringify({ roles }),
-                                        }).then((r) => { if (r.ok) { setRoleName(''); setRoleActions(''); refetch(); } });
-                                    }}
-                                    className="rounded-xl border border-white/10 bg-surface-variant/40 px-4 py-1.5 font-sans text-xs font-semibold text-on-surface hover:bg-surface-variant"
-                                >
-                                    Define Role
-                                </button>
-                                {Object.entries((data.config.roles ?? {}) as Record<string, string[]>).map(([name, actions]) => (
-                                    <span key={name} className="rounded-full border border-secondary/30 bg-surface-container px-3 py-1 font-mono text-xs text-secondary">
-                                        {name}: {actions.join(', ')}
-                                    </span>
-                                ))}
-                            </section>
+                            )}
 
                             {/* Moderation Queue */}
-                            {modQueue.length > 0 && (
+                            {(data.config.extensions ?? []).includes('moderation') && modQueue.length > 0 && (
                                 <section className="glass-card mt-8 rounded-2xl border-tertiary/30 p-5">
                                     <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-tertiary">
                                         Moderation Queue ({modQueue.length})
@@ -985,6 +986,48 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                                     </div>
                                 </section>
                             )}
+                        </ExtensionsShelf>
+                    )}
+
+                    {/* ==== Configuration tab ==== */}
+                    {tab === 'config' && (
+                        <ConfigEditor
+                            rules={data.config.rules}
+                            fields={
+                                (data.config.fields ?? []) as {
+                                    name: string;
+                                    type: string;
+                                    required?: boolean;
+                                    filled_by?: string;
+                                    on_card?: boolean;
+                                    in_csv?: boolean;
+                                    filterable?: boolean;
+                                }[]
+                            }
+                            onSave={(payload) => act(`/admin/sessions/${session.id}/config`, payload)}
+                        />
+                    )}
+
+                    {/* ==== Permissions tab ==== */}
+                    {tab === 'perms' && (
+                        <PermsEditor
+                            sessionId={session.id}
+                            code={data.code}
+                            adminToken={adminToken}
+                            actions={session.perm_actions ?? []}
+                            defaults={session.perm_defaults ?? {}}
+                            perms={(data.config.perms ?? {}) as Record<string, Record<string, boolean>>}
+                            roles={(data.config.roles ?? {}) as Record<string, string[]>}
+                            onSaved={refetch}
+                        />
+                    )}
+
+                    {/* ==== Plugins tab ==== */}
+                    {tab === 'plugins' && <PluginsShelf />}
+
+                    {/* ==== Templates & Activity tab ==== */}
+                    {tab === 'templates' && (
+                        <>
 
                             {/* Session Templates */}
                             <section className="glass-card mt-8 flex flex-wrap items-center gap-3 rounded-2xl p-5">

@@ -42,7 +42,7 @@ class SessionSnapshot
 
         $quiz = null;
         $run = QuizRun::query()->where('group_session_id', $session->id)->latest('id')->first();
-        if ($run !== null && $session->config->quiz() !== []) {
+        if ($run !== null && $session->config->quiz() !== [] && $session->config->hasExtension('quiz')) {
             $questions = $session->config->quiz();
             $answers = QuizAnswer::query()->where('group_session_id', $session->id)->get();
 
