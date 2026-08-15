@@ -27,6 +27,7 @@ it('serves the join page for an existing code', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Session/Join')
+            ->where('session.id', $this->session->id)
             ->where('session.code', $this->session->code));
 });
 

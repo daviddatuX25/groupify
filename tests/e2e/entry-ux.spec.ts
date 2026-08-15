@@ -35,15 +35,49 @@ test('participant can save and remove a room from the homepage', async ({
     await expect(
         page.getByRole('button', { name: /room saved on this browser/i }),
     ).toBeVisible();
-
+    await page.getByLabel('Your name').fill('Maya');
+    const joinResponse = page.waitForResponse(
+        (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === `/join/${code}`,
+    );
+    await page.getByRole('button', { name: /enter the room/i }).click();
+    await joinResponse;
+    await expect(page).toHaveURL(new RegExp(`/s/${code}`));
     await page.goto('/');
     await expect(
         page.getByRole('heading', { name: 'Your saved rooms' }),
     ).toBeVisible();
     await expect(page.getByText(code, { exact: true })).toBeVisible();
 
+    const participantJoinRequest = page.waitForRequest(
+        (request) =>
+            request.method() === 'GET' &&
+            new URL(request.url()).pathname === `/join/${code}`,
+    );
+    await page.getByRole('button', { name: /open room/i }).click();
+    await participantJoinRequest;
+
+    await page.goto('/');
+    await expect(page.getByText(code, { exact: true })).toBeVisible();
+
     await page.getByRole('button', { name: /remove room/i }).click();
     await expect(page.getByText(code, { exact: true })).toHaveCount(0);
+});
+
+test('host saved room reopens the admin view', async ({ page }) => {
+    const code = await createRoom(page);
+
+    await page.goto('/');
+    await expect(page.getByText(code, { exact: true })).toBeVisible();
+    await expect(page.getByText('Host view', { exact: true })).toBeVisible();
+
+    const adminNavigation = page.waitForURL(/\/admin\/sessions\/\d+/);
+    await page.getByRole('button', { name: /open room/i }).click();
+    await adminNavigation;
+    await expect(
+        page.getByRole('heading', { name: 'Groupify Admin' }),
+    ).toBeVisible();
 });
 
 test('continue advances setup without creating the room', async ({ page }) => {

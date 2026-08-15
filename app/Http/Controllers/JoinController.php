@@ -25,6 +25,7 @@ class JoinController
 
         return Inertia::render('Session/Join', [
             'session' => [
+                'id' => $session->id,
                 'code' => $session->code,
                 'status' => $session->status,
                 'pin_required' => ! $pinless,

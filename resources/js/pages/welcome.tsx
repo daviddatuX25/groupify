@@ -1,13 +1,21 @@
 import { Head, Link, router } from '@inertiajs/react';
+import {
+    motion,
+    useMotionValue,
+    useReducedMotion,
+    useSpring,
+} from 'motion/react';
 import { useEffect, useState } from 'react';
+import type { PointerEvent } from 'react';
 import { Logo } from '@/components/Logo';
 import ScanRoomDialog from '@/components/ScanRoomDialog';
 import {
+    getAdminToken,
     listSavedSessions,
     removeSavedSession,
     SAVED_SESSIONS_EVENT,
-    type SavedSession,
 } from '@/lib/savedSessions';
+import type { SavedSession } from '@/lib/savedSessions';
 
 function formatLastVisited(timestamp: number): string {
     const elapsed = Math.max(0, Date.now() - timestamp);
@@ -15,18 +23,37 @@ function formatLastVisited(timestamp: number): string {
     const hour = 60 * minute;
     const day = 24 * hour;
 
-    if (elapsed < minute) return 'Used just now';
-    if (elapsed < hour)
+    if (elapsed < minute) {
+        return 'Used just now';
+    }
+
+    if (elapsed < hour) {
         return `Used ${Math.floor(elapsed / minute)} minutes ago`;
-    if (elapsed < day) return `Used ${Math.floor(elapsed / hour)} hours ago`;
-    if (elapsed < 7 * day) return `Used ${Math.floor(elapsed / day)} days ago`;
+    }
+
+    if (elapsed < day) {
+        return `Used ${Math.floor(elapsed / hour)} hours ago`;
+    }
+
+    if (elapsed < 7 * day) {
+        return `Used ${Math.floor(elapsed / day)} days ago`;
+    }
 
     return `Used on ${new Date(timestamp).toLocaleDateString()}`;
 }
 
+function savedRoleLabel(role: SavedSession['role']): string {
+    return role === 'admin' ? 'Host view' : 'Participant view';
+}
+
 function savedStatus(status: SavedSession['status']): string {
-    if (status === 'archived') return 'This room has ended.';
-    if (status === 'frozen') return 'The room is paused.';
+    if (status === 'archived') {
+        return 'This room has ended.';
+    }
+
+    if (status === 'frozen') {
+        return 'The room is paused.';
+    }
 
     return 'Ready to open.';
 }
@@ -36,6 +63,28 @@ export default function Welcome() {
     const [joinError, setJoinError] = useState('');
     const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
     const [scanOpen, setScanOpen] = useState(false);
+    const reducedMotion = useReducedMotion();
+    const pointerX = useMotionValue(0);
+    const pointerY = useMotionValue(0);
+    const spotlightX = useSpring(pointerX, {
+        stiffness: 90,
+        damping: 24,
+        mass: 0.45,
+    });
+    const spotlightY = useSpring(pointerY, {
+        stiffness: 90,
+        damping: 24,
+        mass: 0.45,
+    });
+
+    const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+        if (reducedMotion || event.pointerType !== 'mouse') {
+            return;
+        }
+
+        pointerX.set(event.clientX - 260);
+        pointerY.set(event.clientY - 260);
+    };
 
     useEffect(() => {
         const refreshSavedSessions = () =>
@@ -52,8 +101,10 @@ export default function Welcome() {
 
     const goJoin = () => {
         const code = joinCode.trim();
+
         if (!/^\d{6}$/.test(code)) {
             setJoinError('Enter the six-digit room code from your host.');
+
             return;
         }
 
@@ -67,6 +118,15 @@ export default function Welcome() {
     };
 
     const openSaved = (session: SavedSession) => {
+        if (session.role === 'admin' && session.sessionId) {
+            const token = getAdminToken(session.code);
+            const query = token ? `?token=${encodeURIComponent(token)}` : '';
+
+            router.visit(`/admin/sessions/${session.sessionId}${query}`);
+
+            return;
+        }
+
         router.visit(`/join/${session.code}`);
     };
 
@@ -78,15 +138,37 @@ export default function Welcome() {
     return (
         <>
             <Head title="Groupify | Make the room easy to join" />
-            <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-surface font-sans text-on-surface selection:bg-primary/30">
+            <div
+                className="relative flex min-h-screen flex-col overflow-x-hidden bg-surface font-sans text-on-surface selection:bg-primary/30"
+                onPointerMove={handlePointerMove}
+                onPointerLeave={() => {
+                    if (!reducedMotion) {
+                        pointerX.set(0);
+                        pointerY.set(0);
+                    }
+                }}
+            >
                 <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
                     <div className="absolute inset-0 bg-[#0b1326]" />
                     <div className="absolute -top-32 left-1/2 h-[680px] w-[680px] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
                     <div className="absolute bottom-0 left-0 h-[460px] w-[460px] rounded-full bg-secondary/10 blur-3xl" />
                     <div className="absolute right-0 bottom-0 h-[460px] w-[460px] rounded-full bg-tertiary-container/10 blur-3xl" />
+                    <motion.div
+                        aria-hidden="true"
+                        className="absolute top-0 left-0 h-[520px] w-[520px] rounded-full bg-primary/10 blur-[90px]"
+                        style={{ x: spotlightX, y: spotlightY }}
+                    />
                 </div>
 
-                <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-6 sm:px-8">
+                <motion.header
+                    className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-6 sm:px-8"
+                    initial={reducedMotion ? false : { opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                        duration: 0.4,
+                        ease: [0.22, 1, 0.36, 1],
+                    }}
+                >
                     <Link
                         href="/"
                         className="flex items-center gap-3"
@@ -109,9 +191,18 @@ export default function Welcome() {
                         </span>
                         Create a room
                     </Link>
-                </header>
+                </motion.header>
 
-                <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 pb-14 sm:px-8">
+                <motion.main
+                    className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 pb-14 sm:px-8"
+                    initial={reducedMotion ? false : { opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                        delay: 0.08,
+                        duration: 0.5,
+                        ease: [0.22, 1, 0.36, 1],
+                    }}
+                >
                     <section className="grid min-w-0 items-stretch gap-5 pt-8 pb-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-6 lg:pt-14">
                         <div className="flex min-w-0 flex-col justify-center rounded-[2rem] border border-white/10 bg-surface-container/35 p-7 shadow-2xl backdrop-blur-md sm:p-10">
                             <div className="max-w-2xl">
@@ -277,10 +368,34 @@ export default function Welcome() {
 
                         {savedSessions.length > 0 ? (
                             <div className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                                {savedSessions.map((session) => (
-                                    <article
+                                {savedSessions.map((session, index) => (
+                                    <motion.article
                                         key={session.code}
-                                        className="group flex flex-col rounded-2xl border border-white/10 bg-surface-container/70 p-5 shadow-xl transition-all hover:border-primary/40 hover:bg-surface-container"
+                                        className="group flex flex-col rounded-2xl border border-white/10 bg-surface-container/70 p-5 shadow-xl transition-colors hover:border-primary/40 hover:bg-surface-container"
+                                        initial={
+                                            reducedMotion
+                                                ? false
+                                                : { opacity: 0, y: 12 }
+                                        }
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{
+                                            delay: Math.min(
+                                                index * 0.05,
+                                                0.25,
+                                            ),
+                                            duration: 0.32,
+                                            ease: [0.22, 1, 0.36, 1],
+                                        }}
+                                        whileHover={
+                                            reducedMotion
+                                                ? undefined
+                                                : { y: -4 }
+                                        }
+                                        whileTap={
+                                            reducedMotion
+                                                ? undefined
+                                                : { scale: 0.99 }
+                                        }
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
@@ -299,11 +414,16 @@ export default function Welcome() {
                                                     : 'Saved'}
                                             </span>
                                         </div>
-                                        <p className="mt-4 text-xs text-on-surface-variant">
+                                        <p className="mt-4 flex flex-wrap items-center gap-1.5 text-xs text-on-surface-variant">
+                                            <span className="rounded-full border border-secondary/20 bg-secondary/10 px-2 py-0.5 font-mono text-[9px] font-bold tracking-wider text-secondary uppercase">
+                                                {savedRoleLabel(session.role)}
+                                            </span>
+                                            <span aria-hidden="true">·</span>
                                             {formatLastVisited(
                                                 session.lastVisitedAt,
                                             )}
-                                            . {savedStatus(session.status)}
+                                            <span aria-hidden="true">·</span>
+                                            {savedStatus(session.status)}
                                         </p>
                                         <div className="mt-5 flex items-center gap-2">
                                             <button
@@ -332,7 +452,7 @@ export default function Welcome() {
                                                 </span>
                                             </button>
                                         </div>
-                                    </article>
+                                    </motion.article>
                                 ))}
                             </div>
                         ) : (
@@ -401,7 +521,7 @@ export default function Welcome() {
                             </p>
                         </div>
                     </section>
-                </main>
+                </motion.main>
 
                 <footer className="relative z-10 border-t border-white/5 bg-surface-container-lowest/80 py-6 text-center backdrop-blur-sm">
                     <p className="font-mono text-xs text-on-surface-variant/60">

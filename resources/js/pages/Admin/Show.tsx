@@ -7,10 +7,10 @@ import MemberActionDialog from '@/components/MemberActionDialog';
 import ParticipantAvatar from '@/components/ParticipantAvatar';
 import ServerStatus from '@/components/ServerStatus';
 import { configureGroupifyEcho } from '@/lib/echo';
+import { saveAdminToken, saveSession } from '@/lib/savedSessions';
 import ConfigEditor from './ConfigEditor';
 import PermsEditor from './PermsEditor';
 import PluginsPanel from './PluginsPanel';
-
 type Avatar = { style?: string | null; seed?: string | null };
 type Member = {
     id: number;
@@ -332,7 +332,7 @@ export default function Show({
         }
     };
 
-    // Persist token (AD-3) + live subscription (AD-6)
+    // Persist token and host identity (AD-3), then subscribe to live updates.
     useEffect(() => {
         try {
             if (typeof window === 'undefined') {
@@ -340,6 +340,16 @@ export default function Show({
             }
 
             window.localStorage.setItem('groupify.admin_token', adminToken);
+            saveAdminToken(data.code, adminToken);
+            saveSession(
+                session.code,
+                session.status as 'live' | 'frozen' | 'archived',
+                session.purge_at ?? session.ends_at,
+                {
+                    role: 'admin',
+                    sessionId: session.id,
+                },
+            );
             configureGroupifyEcho({ adminToken });
             const channel = echo().channel(`session.${data.code}`);
             CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));

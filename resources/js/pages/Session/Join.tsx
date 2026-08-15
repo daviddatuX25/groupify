@@ -10,6 +10,7 @@ export default function Join({
     session,
 }: {
     session: {
+        id: number;
         code: string;
         status: 'live' | 'frozen' | 'archived';
         pin_required: boolean;
@@ -118,6 +119,7 @@ export default function Join({
                 session.code,
                 session.status,
                 session.purge_at ?? session.ends_at,
+                { role: 'participant', sessionId: session.id },
             );
         }
 
@@ -130,6 +132,7 @@ export default function Join({
                 session.code,
                 session.status,
                 session.purge_at ?? session.ends_at,
+                { role: 'participant', sessionId: session.id },
             );
         }
 
