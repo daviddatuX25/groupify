@@ -6,6 +6,7 @@ use App\Events\SessionDeleted;
 use App\Events\SessionStateUpdated;
 use App\Models\Session;
 use App\Services\EventRecorder;
+use App\Services\SessionLifecycleService;
 use App\Support\SessionConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class SessionStateController
     use AuthorizesAdminToken;
 
     /** Freeze / unfreeze (config rules.freeze, AD-4) and archive (status). */
-    public function update(Request $request, Session $session, EventRecorder $recorder): JsonResponse
+    public function update(Request $request, Session $session, EventRecorder $recorder, SessionLifecycleService $lifecycle): JsonResponse
     {
         $this->authorizeAdmin($session, $request);
 
@@ -28,7 +29,7 @@ class SessionStateController
                 throw ValidationException::withMessages(['action' => 'Session is already archived.']);
             }
 
-            $session->update(['status' => 'archived']);
+            $lifecycle->archive($session);
         } else {
             $freeze = $action === 'freeze';
             $data = $session->config->toArray();

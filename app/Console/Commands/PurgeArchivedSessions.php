@@ -6,7 +6,7 @@ use App\Models\Session;
 use Illuminate\Console\Command;
 
 /**
- * FR-1.7: archived sessions auto-purge after 30 days (daily).
+ * FR-1.7: archived sessions purge at their configured deadline (daily).
  * Deletion is the full token-revocation path (AD-3); participants cascade.
  */
 final class PurgeArchivedSessions extends Command
@@ -17,11 +17,10 @@ final class PurgeArchivedSessions extends Command
 
     public function handle(): int
     {
-        $cutoff = now()->subDays(30);
-
         $count = Session::query()
             ->where('status', 'archived')
-            ->where('updated_at', '<', $cutoff)
+            ->whereNotNull('purge_at')
+            ->where('purge_at', '<=', now())
             ->delete();
 
         $this->info("Purged {$count} archived session(s).");

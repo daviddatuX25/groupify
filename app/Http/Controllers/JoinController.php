@@ -17,10 +17,21 @@ use Inertia\Response;
 class JoinController
 {
     /** GET /join/{code} — participant entry (FR-2.1). PIN is never exposed here. */
-    public function show(Session $session): Response
+    public function show(Request $request, Session $session): Response
     {
+        $qrToken = $request->query('qr_token');
+        $qrAuthorized = is_string($qrToken)
+            && is_string($session->qr_token)
+            && $qrToken !== ''
+            && hash_equals($session->qr_token, $qrToken);
+        $pinless = $qrAuthorized && (bool) ($session->config->rules()['qr_pinless'] ?? true);
+
         return Inertia::render('Session/Join', [
-            'session' => ['code' => $session->code, 'status' => $session->status],
+            'session' => [
+                'code' => $session->code,
+                'status' => $session->status,
+                'pin_required' => ! $pinless,
+            ],
         ]);
     }
 
@@ -51,11 +62,23 @@ class JoinController
         }
 
         $data = $request->validate([
-            'pin' => ['required', 'digits:4'],
+            'pin' => ['nullable', 'digits:4'],
             'name' => ['required', 'string', 'max:80'],
             'email' => ['nullable', 'email', 'max:255'],
             'device_token' => ['required', 'uuid'],
+            'qr_token' => ['nullable', 'string', 'max:128'],
         ]);
+
+        $qrToken = $data['qr_token'] ?? '';
+        $pinlessQr = is_string($qrToken)
+            && is_string($session->qr_token)
+            && $qrToken !== ''
+            && hash_equals($session->qr_token, $qrToken)
+            && (bool) ($session->config->rules()['qr_pinless'] ?? true);
+
+        if (! $pinlessQr && ($data['pin'] ?? '') === '') {
+            throw ValidationException::withMessages(['pin' => 'Enter the 4-digit PIN shown by the host.']);
+        }
 
         // PIN brute-force guard: 10 wrong PINs per session within 5 minutes
         // locks further attempts for that session only (mass joins from one
@@ -63,15 +86,17 @@ class JoinController
         $limiter = app(RateLimiter::class);
         $key = 'join-pin:'.$session->id;
 
-        if (! hash_equals($session->pin, $data['pin'])) {
-            $limiter->hit($key, 5 * 60);
-            if ($limiter->tooManyAttempts($key, 10)) {
-                abort(429, 'Too many failed PIN attempts. Try again in a few minutes.');
+        if (! $pinlessQr) {
+            if (! hash_equals($session->pin, $data['pin'] ?? '')) {
+                $limiter->hit($key, 5 * 60);
+                if ($limiter->tooManyAttempts($key, 10)) {
+                    abort(429, 'Too many failed PIN attempts. Try again in a few minutes.');
+                }
+                throw ValidationException::withMessages(['pin' => 'Wrong PIN.']);
             }
-            throw ValidationException::withMessages(['pin' => 'Wrong PIN.']);
-        }
 
-        $limiter->clear($key);
+            $limiter->clear($key);
+        }
 
         $name = trim($data['name']);
 

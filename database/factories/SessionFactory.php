@@ -20,6 +20,7 @@ class SessionFactory extends Factory
             'code' => (string) random_int(100000, 999999),
             'pin' => (string) random_int(1000, 9999),
             'admin_token' => Str::random(40),
+            'qr_token' => Str::random(64),
             'status' => 'live',
             'config' => SessionConfig::defaults(),
         ];

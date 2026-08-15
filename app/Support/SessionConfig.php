@@ -30,7 +30,9 @@ class SessionConfig implements Arrayable, JsonSerializable
             'rules' => [
                 'min_members' => 3,
                 'max_members' => 6,
-                'join_mode' => 'open', // open | approval
+                'join_mode' => 'open', // open | approval (group joins)
+                'qr_pinless' => true,
+                'retention_days' => 30, // 1 | 2 | 30 | 180 | null (manual delete)
                 'allow_user_creation' => true,
                 'naming' => 'alpha', // alpha = Team Alpha/Bravo… | table = Table 1/2…
                 'freeze' => false,

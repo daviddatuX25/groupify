@@ -6,8 +6,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('purges archived sessions older than 30 days with their rows', function () {
-    $old = Session::factory()->create(['status' => 'archived', 'updated_at' => now()->subDays(31)]);
+it('purges archived sessions at their configured deadline with their rows', function () {
+    $old = Session::factory()->create(['status' => 'archived', 'purge_at' => now()->subMinute()]);
     Participant::factory()->create(['group_session_id' => $old->id]);
 
     $this->artisan('sessions:purge')->assertSuccessful();
@@ -16,8 +16,8 @@ it('purges archived sessions older than 30 days with their rows', function () {
         ->and(Participant::query()->count())->toBe(0);
 });
 
-it('keeps archived sessions younger than 30 days', function () {
-    Session::factory()->create(['status' => 'archived', 'updated_at' => now()->subDays(29)]);
+it('keeps archived sessions before their configured deadline', function () {
+    Session::factory()->create(['status' => 'archived', 'purge_at' => now()->addDay()]);
 
     $this->artisan('sessions:purge')->assertSuccessful();
 

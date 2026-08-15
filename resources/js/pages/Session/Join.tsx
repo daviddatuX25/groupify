@@ -1,7 +1,7 @@
 import { router, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Logo } from '@/components/Logo';
-export default function Join({ session }: { session: { code: string; status: string } }) {
+export default function Join({ session }: { session: { code: string; status: string; pin_required: boolean } }) {
     const [checking, setChecking] = useState(false);
 
     const deviceToken = useMemo(() => {
@@ -20,6 +20,12 @@ export default function Join({ session }: { session: { code: string; status: str
             window.localStorage.setItem('groupify.device_token', t);
         }
         return t;
+    }, []);
+    // QR grants are scoped to this session and only skip the PIN when the
+    // facilitator enabled pinless QR access.
+    const qrToken = useMemo(() => {
+        if (typeof window === 'undefined') return '';
+        return new URLSearchParams(window.location.search).get('qr_token') ?? '';
     }, []);
 
     // FR-2.4: a returning device with a seat skips the form and lands straight in.
@@ -44,6 +50,7 @@ export default function Join({ session }: { session: { code: string; status: str
         name: '',
         email: '',
         device_token: deviceToken,
+        qr_token: qrToken,
     });
 
     if (checking) {
@@ -94,8 +101,14 @@ export default function Join({ session }: { session: { code: string; status: str
                             {session.code}
                         </h2>
                         <p className="mt-1 text-xs text-on-surface-variant">
-                            Enter the 4-digit PIN your host is showing on screen.
+                            {session.pin_required ? 'Enter the 4-digit PIN your host is showing on screen.' : 'You arrived through the host’s QR code. No PIN is needed.'}
                         </p>
+                        {!session.pin_required && (
+                            <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
+                                <span className="material-symbols-outlined text-[14px]">qr_code_2</span>
+                                QR access
+                            </span>
+                        )}
                     </div>
 
                     {/* Form Fields */}
@@ -107,23 +120,25 @@ export default function Join({ session }: { session: { code: string; status: str
                         }}
                     >
                         {/* PIN Input */}
-                        <div>
-                            <label className="sr-only" htmlFor="pin">
-                                4-Digit PIN
-                            </label>
-                            <input
-                                id="pin"
-                                type="text"
-                                inputMode="numeric"
-                                autoFocus
-                                maxLength={4}
-                                placeholder="PIN"
-                                value={data.pin}
-                                onChange={(e) => setData('pin', e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                className="w-full rounded-xl border border-white/10 bg-[#060e20] py-3.5 text-center font-mono text-3xl font-extrabold tracking-[0.5em] text-[#ec4899] placeholder:font-mono placeholder:text-sm placeholder:tracking-normal placeholder:text-on-surface-variant/30 focus:border-primary focus:shadow-[0_0_15px_rgba(78,222,61,0.25)] focus:outline-none transition-all"
-                            />
-                            {errors.pin && <p className="mt-1.5 font-mono text-xs text-error">{errors.pin}</p>}
-                        </div>
+                        {session.pin_required && (
+                            <div>
+                                <label className="sr-only" htmlFor="pin">
+                                    4-Digit PIN
+                                </label>
+                                <input
+                                    id="pin"
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoFocus
+                                    maxLength={4}
+                                    placeholder="PIN"
+                                    value={data.pin}
+                                    onChange={(e) => setData('pin', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                    className="w-full rounded-xl border border-white/10 bg-[#060e20] py-3.5 text-center font-mono text-3xl font-extrabold tracking-[0.5em] text-[#ec4899] placeholder:font-mono placeholder:text-sm placeholder:tracking-normal placeholder:text-on-surface-variant/30 focus:border-primary focus:shadow-[0_0_15px_rgba(78,222,61,0.25)] focus:outline-none transition-all"
+                                />
+                                {errors.pin && <p className="mt-1.5 font-mono text-xs text-error">{errors.pin}</p>}
+                            </div>
+                        )}
 
                         {/* Name and Email */}
                         <div className="flex flex-col gap-3">
@@ -161,7 +176,7 @@ export default function Join({ session }: { session: { code: string; status: str
                         {/* Submit Button */}
                         <button
                             type="submit"
-                            disabled={processing || data.pin.length < 4 || !data.name.trim()}
+                            disabled={processing || (session.pin_required && data.pin.length < 4) || !data.name.trim()}
                             className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary-container py-3.5 font-display text-base font-bold text-on-primary-container shadow-[0_0_20px_rgba(78,222,61,0.25)] transition-all duration-200 hover:shadow-[0_0_30px_rgba(78,222,61,0.4)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             <span>{processing ? 'Entering…' : 'Enter the room'}</span>

@@ -39,6 +39,10 @@ export default function Show({
     session: Board & {
         id: number;
         pin: string;
+        qr_token?: string;
+        ends_at?: string | null;
+        archived_at?: string | null;
+        purge_at?: string | null;
         admin_token?: string;
         perm_actions?: string[];
         perm_defaults?: Record<string, Record<string, boolean>>;
@@ -109,7 +113,8 @@ export default function Show({
     const qrRef = (node: HTMLCanvasElement | null) => {
         if (node && data.code) {
             const base = joinBase || window.location.origin;
-            void QRCode.toCanvas(node, `${base}/join/${data.code}`, {
+            const qrToken = session.qr_token ? `?qr_token=${encodeURIComponent(session.qr_token)}` : '';
+            void QRCode.toCanvas(node, `${base}/join/${data.code}${qrToken}`, {
                 width: 160,
                 margin: 1,
                 color: { dark: '#0e1511', light: '#ffffff' },
@@ -353,6 +358,10 @@ export default function Show({
                                     <p className="mt-0.5 font-mono text-2xl font-extrabold tracking-widest text-secondary">
                                         {data.code}
                                     </p>
+                                    <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wider text-primary">
+                                        <span className="material-symbols-outlined text-[13px]">qr_code_2</span>
+                                        {data.config.rules.qr_pinless === false ? 'PIN required' : 'PIN bypass enabled'}
+                                    </p>
                                 </div>
 
                                 <div className="w-full">
@@ -390,6 +399,9 @@ export default function Show({
                                                 <span className="h-2 w-2 animate-pulse rounded-full bg-primary shadow-[0_0_6px_#6dfc57]" />
                                                 {(liveCount ?? data.presence)} online
                                             </span>
+                                        <span className="font-mono text-[10px] text-on-surface-variant">
+                                            {session.ends_at ? `Ends ${new Date(session.ends_at).toLocaleString()}` : 'Manual end'}
+                                        </span>
                                         </div>
                                     </div>
 

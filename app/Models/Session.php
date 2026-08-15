@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\SessionConfigCast;
 use App\Support\SessionConfig;
+use Carbon\Carbon;
 use Database\Factories\SessionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property-read SessionConfig $config
+ * @property-read Carbon|null $ends_at
+ * @property-read Carbon|null $archived_at
+ * @property-read Carbon|null $purge_at
  */
 class Session extends Model
 {
@@ -26,6 +30,9 @@ class Session extends Model
         return [
             'config' => SessionConfigCast::class,
             'dissolve_at' => 'datetime',
+            'ends_at' => 'datetime',
+            'archived_at' => 'datetime',
+            'purge_at' => 'datetime',
         ];
     }
 

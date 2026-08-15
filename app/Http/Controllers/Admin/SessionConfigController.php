@@ -63,6 +63,8 @@ class SessionConfigController
             'rules.min_members' => ['required', 'integer', 'min:1'],
             'rules.max_members' => ['required', 'integer', 'gte:rules.min_members'],
             'rules.join_mode' => ['required', 'in:open,approval'],
+            'rules.qr_pinless' => ['required', 'boolean'],
+            'rules.retention_days' => ['nullable', 'integer', 'in:1,2,30,180'],
             'rules.allow_user_creation' => ['required', 'boolean'],
             'rules.naming' => ['required', 'string', 'max:50'],
             'rules.freeze' => ['required', 'boolean'],

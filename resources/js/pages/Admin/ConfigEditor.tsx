@@ -166,6 +166,25 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                     <Toggle on={Boolean(rule(draft, 'chat_enabled', false))} onChange={(v) => set('chat_enabled', v)} label="Chat enabled (room + group channels)" hint="Shows the messaging dock and group chat to participants." />
                     <Toggle on={Boolean(rule(draft, 'freeze', false))} onChange={(v) => set('freeze', v)} label="Frozen (board read-only)" hint="Stops joins, leaves, and moves while keeping the board visible." />
                 </div>
+                    <Toggle
+                        on={Boolean(rule(draft, 'qr_pinless', true))}
+                        onChange={(v) => set('qr_pinless', v)}
+                        label="QR skips PIN"
+                        hint="Trusted scans can join without typing the session PIN."
+                    />
+                    <Select
+                        label="Result retention"
+                        hint="Archived sessions remain read-only until this deadline."
+                        value={String(rule(draft, 'retention_days', 30) ?? 'forever')}
+                        onChange={(v) => set('retention_days', v === 'forever' ? null : Number(v))}
+                        options={[
+                            ['1', '1 day'],
+                            ['2', '2 days'],
+                            ['30', '30 days'],
+                            ['180', '6 months'],
+                            ['forever', 'Until manual deletion'],
+                        ]}
+                    />
 
                 <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                     <Select
