@@ -54,7 +54,9 @@ Route::post('/s/{session:code}/groups/{group}/leave', [GroupController::class, '
 Route::post('/s/{session:code}/groups/{group}/requests/{participant}/approve', [GroupController::class, 'approve'])->name('groups.approve');
 Route::post('/s/{session:code}/groups/{group}/requests/{participant}/reject', [GroupController::class, 'reject'])->name('groups.reject');
 
-// Admin-only (AD-3: token in query or X-Admin-Token header)
+// Admin saved-room resolver — 404 unless this browser already proves ownership.
+Route::get('/admin/sessions/lookup/{session:code}', [AdminPanelController::class, 'lookup'])
+    ->name('admin.sessions.lookup');
 Route::get('/admin/sessions/{session}', [AdminPanelController::class, 'show'])->name('admin.sessions.show');
 Route::put('/admin/sessions/{session}/config', [SessionConfigController::class, 'update'])
     ->name('admin.sessions.config.update');

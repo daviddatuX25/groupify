@@ -80,6 +80,39 @@ test('host saved room reopens the admin view', async ({ page }) => {
     ).toBeVisible();
 });
 
+test('legacy saved host room upgrades to the admin view', async ({ page }) => {
+    const code = await createRoom(page);
+
+    await page.evaluate((roomCode) => {
+        const sessions = JSON.parse(
+            localStorage.getItem('groupify.saved_sessions.v1') ?? '[]',
+        ) as Record<string, unknown>[];
+        const saved = sessions.find((session) => session.code === roomCode);
+
+        if (saved) {
+            delete saved.role;
+            delete saved.sessionId;
+        }
+
+        localStorage.setItem(
+            'groupify.saved_sessions.v1',
+            JSON.stringify(sessions),
+        );
+        localStorage.removeItem('groupify.admin_tokens.v1');
+    }, code);
+
+    await page.goto('/');
+    await expect(
+        page.getByText('Participant view', { exact: true }),
+    ).toBeVisible();
+
+    const adminNavigation = page.waitForURL(/\/admin\/sessions\/\d+/);
+    await page.getByRole('button', { name: /open room/i }).click();
+    await adminNavigation;
+    await expect(
+        page.getByRole('heading', { name: 'Groupify Admin' }),
+    ).toBeVisible();
+});
 test('continue advances setup without creating the room', async ({ page }) => {
     const sessionPosts: string[] = [];
     page.on('request', (request) => {

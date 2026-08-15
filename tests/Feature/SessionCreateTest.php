@@ -78,6 +78,23 @@ it('opens the admin panel with a valid token', function () {
             ->where('session.pin', $session->pin));
 });
 
+it('resolves a legacy saved room code for its admin', function () {
+    $session = Session::factory()->create();
+
+    $this->getJson(
+        route('admin.sessions.lookup', $session),
+        ['X-Admin-Token' => $session->admin_token],
+    )
+        ->assertOk()
+        ->assertJsonPath('id', $session->id)
+        ->assertJsonPath('code', $session->code);
+
+    $this->getJson(
+        route('admin.sessions.lookup', $session),
+        ['X-Admin-Token' => 'wrong-token'],
+    )->assertNotFound();
+});
+
 it('rejects the admin panel without a valid token', function () {
     $session = Session::factory()->create();
 

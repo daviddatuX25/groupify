@@ -13,6 +13,8 @@ import {
     getAdminToken,
     listSavedSessions,
     removeSavedSession,
+    saveAdminToken,
+    saveSession,
     SAVED_SESSIONS_EVENT,
 } from '@/lib/savedSessions';
 import type { SavedSession } from '@/lib/savedSessions';
@@ -117,12 +119,57 @@ export default function Welcome() {
         router.visit(destination);
     };
 
-    const openSaved = (session: SavedSession) => {
-        if (session.role === 'admin' && session.sessionId) {
-            const token = getAdminToken(session.code);
+    const openSaved = async (session: SavedSession) => {
+        let sessionId = session.sessionId;
+        let token =
+            session.role === 'admin' ? getAdminToken(session.code) : null;
+
+        if (session.role === undefined) {
+            token =
+                getAdminToken(session.code) ??
+                window.localStorage.getItem('groupify.admin_token');
+
+            try {
+                const response = await fetch(
+                    `/admin/sessions/lookup/${session.code}`,
+                    {
+                        headers: token
+                            ? {
+                                  'X-Admin-Token': token,
+                                  Accept: 'application/json',
+                              }
+                            : { Accept: 'application/json' },
+                    },
+                );
+
+                if (response.ok) {
+                    const resolved = (await response.json()) as {
+                        id: number;
+                        status: SavedSession['status'];
+                        ends_at?: string | null;
+                        purge_at?: string | null;
+                    };
+                    sessionId = resolved.id;
+                    saveSession(
+                        session.code,
+                        resolved.status,
+                        resolved.purge_at ?? resolved.ends_at,
+                        { role: 'admin', sessionId },
+                    );
+
+                    if (token) {
+                        saveAdminToken(session.code, token);
+                    }
+                }
+            } catch {
+                // Fall through to the participant join path.
+            }
+        }
+
+        if (sessionId && session.role !== 'participant') {
             const query = token ? `?token=${encodeURIComponent(token)}` : '';
 
-            router.visit(`/admin/sessions/${session.sessionId}${query}`);
+            router.visit(`/admin/sessions/${sessionId}${query}`);
 
             return;
         }
@@ -379,10 +426,7 @@ export default function Welcome() {
                                         }
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{
-                                            delay: Math.min(
-                                                index * 0.05,
-                                                0.25,
-                                            ),
+                                            delay: Math.min(index * 0.05, 0.25),
                                             duration: 0.32,
                                             ease: [0.22, 1, 0.36, 1],
                                         }}
