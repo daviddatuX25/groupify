@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MembershipChanged;
 use App\Models\Participant;
 use App\Models\Session;
 use App\Services\EventRecorder;
@@ -137,11 +138,11 @@ class JoinController
         $anonymous = $session->config->rules()['anonymous_mode'] ?? false;
 
         // Proxy claim (CAP-11): joining with an existing seat's name claims it
-        // when the seat is unclaimed; a claimed seat rejects other devices.
         $seat = Participant::query()
             ->where('group_session_id', $session->id)
             ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
             ->first();
+        $joinedNow = false;
 
         if ($seat !== null && $seat->token !== $data['device_token']) {
             if ($seat->token !== null) {
@@ -150,6 +151,7 @@ class JoinController
 
             $seat->update(['token' => $data['device_token']]);
             $participant = $seat;
+            $joinedNow = true;
             $recorder->record($session, 'participant_joined', ['name' => $participant->name]);
         } elseif ($seat !== null) {
             $participant = $seat;
@@ -162,10 +164,15 @@ class JoinController
                     'email' => $data['email'] ?? null,
                 ],
             );
+            $joinedNow = $participant->wasRecentlyCreated;
         }
 
         if ($participant->wasRecentlyCreated) {
             $recorder->record($session, 'participant_joined', ['name' => $participant->name]);
+        }
+
+        if ($joinedNow) {
+            broadcast(new MembershipChanged($session, 0, 'participant_joined'))->toOthers();
         }
 
         return redirect()->route('session.show', [

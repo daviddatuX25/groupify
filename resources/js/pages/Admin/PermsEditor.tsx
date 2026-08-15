@@ -1,4 +1,12 @@
 import { useState } from 'react';
+import MemberActionDialog from '@/components/MemberActionDialog';
+
+type Participant = {
+    id: number;
+    name: string;
+    role?: string;
+    custom_role?: string | null;
+};
 
 type Props = {
     sessionId: number;
@@ -8,6 +16,7 @@ type Props = {
     defaults: Record<string, Record<string, boolean>>;
     perms: Record<string, Record<string, boolean>>;
     roles: Record<string, string[]>;
+    participants: Participant[];
     onSaved: () => void;
 };
 
@@ -22,11 +31,11 @@ const ROLE_LABEL: Record<(typeof ROLES)[number], string> = {
  * Permission gates assignment (flexibility-model.md §1): the action × role
  * matrix overrides the system defaults, plus custom session roles.
  */
-export default function PermsEditor({ sessionId, code, adminToken, actions, defaults, perms, roles, onSaved }: Props) {
+export default function PermsEditor({ sessionId, code, adminToken, actions, defaults, perms, roles, participants, onSaved }: Props) {
     const [overrides, setOverrides] = useState<Record<string, Record<string, boolean>>>({ ...perms });
     const [roleName, setRoleName] = useState('');
     const [roleActions, setRoleActions] = useState('');
-
+    const [assignmentParticipant, setAssignmentParticipant] = useState<Participant | null>(null);
     const effective = (action: string, role: string): boolean =>
         overrides[action]?.[role] ?? defaults[action]?.[role] ?? false;
 
@@ -35,6 +44,7 @@ export default function PermsEditor({ sessionId, code, adminToken, actions, defa
         setOverrides((o) => {
             const next = { ...o };
             next[action] = { ...(next[action] ?? {}), [role]: !current };
+
             return next;
         });
     };
@@ -51,14 +61,20 @@ export default function PermsEditor({ sessionId, code, adminToken, actions, defa
             },
             body: JSON.stringify({ perms: overrides }),
         }).then((r) => {
-            if (r.ok) onSaved();
+            if (r.ok) {
+onSaved();
+}
         });
     };
 
     const defineRole = () => {
         const name = roleName.trim();
         const actionsList = roleActions.split(',').map((a) => a.trim()).filter(Boolean);
-        if (!name) return;
+
+        if (!name) {
+return;
+}
+
         const xsrf = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1];
         void fetch(`/admin/sessions/${sessionId}/config`, {
             method: 'PUT',
@@ -75,6 +91,23 @@ export default function PermsEditor({ sessionId, code, adminToken, actions, defa
                 setRoleActions('');
                 onSaved();
             }
+        });
+    };
+    const assignRole = (participantId: number, role: string) => {
+        const xsrf = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1];
+        void fetch(`/admin/sessions/${sessionId}/members/${participantId}/role`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Admin-Token': adminToken,
+                ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : {}),
+            },
+            body: JSON.stringify({ role: role || null }),
+        }).then((r) => {
+            if (r.ok) {
+onSaved();
+}
         });
     };
 
@@ -118,6 +151,7 @@ export default function PermsEditor({ sessionId, code, adminToken, actions, defa
                                     <td className="py-2.5 pr-3 font-mono text-xs text-on-surface">{action}</td>
                                     {ROLES.map((role) => {
                                         const on = effective(action, role);
+
                                         return (
                                             <td key={role} className="py-2.5 text-center">
                                                 <button
@@ -151,8 +185,7 @@ export default function PermsEditor({ sessionId, code, adminToken, actions, defa
                 <div className="border-b border-white/10 pb-3">
                     <h3 className="font-display text-base font-bold text-on-surface">Custom Roles</h3>
                     <p className="mt-0.5 text-xs text-on-surface-variant">
-                        Session-scoped roles with their own action sets (e.g. a co-host who can announce). Assign them
-                        to participants from the pool chips below the board.
+                        Session-scoped roles with additive action grants (e.g. a co-host who can announce).
                     </p>
                 </div>
 
@@ -189,6 +222,60 @@ export default function PermsEditor({ sessionId, code, adminToken, actions, defa
                     Participants on this session: {code}
                 </p>
             </section>
+            <section className="glass-card rounded-2xl p-5 shadow-xl">
+                <div className="border-b border-white/10 pb-3">
+                    <h3 className="font-display text-base font-bold text-on-surface">Assign to participants</h3>
+                    <p className="mt-0.5 text-xs text-on-surface-variant">
+                        Custom grants apply in addition to each participant’s base role. Clear a role to restore the base permissions only.
+                    </p>
+                </div>
+                {Object.keys(roles).length === 0 ? (
+                    <p className="mt-4 rounded-xl border border-white/10 bg-surface-container-lowest p-4 text-xs text-on-surface-variant">
+                        Define a custom role above before assigning one.
+                    </p>
+                ) : (
+                    <div className="mt-4 space-y-2">
+                        {participants.map((participant) => (
+                            <div key={participant.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface-container-lowest p-3">
+                                <div>
+                                    <p className="text-xs font-semibold text-on-surface">{participant.name}</p>
+                                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">
+                                        base: {participant.role ?? 'member'}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="rounded-lg border border-white/10 bg-surface-container px-2.5 py-2 text-xs text-on-surface-variant">
+                                        {participant.custom_role ?? 'No custom role'}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAssignmentParticipant(participant)}
+                                        disabled={Object.keys(roles).length === 0}
+                                        className="rounded-lg border border-secondary/30 bg-secondary/10 px-3 py-2 text-xs font-semibold text-secondary hover:bg-secondary/20 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        Assign role
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                        {participants.length === 0 && <p className="py-6 text-center text-xs text-on-surface-variant/60">Participants will appear here after they join.</p>}
+                    </div>
+                )}
+            </section>
+        {assignmentParticipant && (
+            <MemberActionDialog
+                action="role"
+                members={[{ id: assignmentParticipant.id, name: assignmentParticipant.name, groupName: 'Participant' }]}
+                groups={[]}
+                roles={Object.keys(roles)}
+                initialValue={assignmentParticipant.custom_role ?? ''}
+                onClose={() => setAssignmentParticipant(null)}
+                onConfirm={(role) => {
+                    assignRole(assignmentParticipant.id, role);
+                    setAssignmentParticipant(null);
+                }}
+            />
+        )}
         </div>
     );
 }

@@ -101,6 +101,27 @@ it('indexes announcements for everyone and group chat only for members', functio
         ->assertOk()
         ->assertJsonCount(2, 'messages');
 });
+it('lets the admin monitor room and group messages with explicit scopes', function () {
+    SessionMessage::query()->create([
+        'group_session_id' => $this->session->id,
+        'scope' => 'global',
+        'author_id' => $this->outsider->id,
+        'body' => 'Room question',
+    ]);
+    SessionMessage::query()->create([
+        'group_session_id' => $this->session->id,
+        'group_id' => $this->group->id,
+        'scope' => 'group',
+        'author_id' => $this->member->id,
+        'body' => 'Team note',
+    ]);
+
+    $this->getJson(route('admin.messages.index', $this->session), $this->adminHeaders)
+        ->assertOk()
+        ->assertJsonCount(2, 'messages')
+        ->assertJsonFragment(['scope' => 'global', 'body' => 'Room question'])
+        ->assertJsonFragment(['scope' => 'group', 'group_id' => $this->group->id, 'body' => 'Team note']);
+});
 
 it('disables chat entirely when the flag is off', function () {
     $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), [

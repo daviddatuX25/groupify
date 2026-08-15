@@ -1,11 +1,11 @@
 import { echo, useConnectionStatus } from '@laravel/echo-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ComingNext from '@/components/ComingNext';
-import { configureGroupifyEcho } from '@/lib/echo';
 import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { configureGroupifyEcho } from '@/lib/echo';
 
-type Member = { id: number; name: string; role: string };
+type Member = { id: number; name: string; role: string; custom_role?: string | null };
 type Group = {
     id: number;
     name: string;
@@ -20,6 +20,14 @@ type Group = {
 type Field = { name: string; type: string; required?: boolean; filled_by?: string };
 type Me = { id: number; name: string; pooled: boolean } | null;
 
+type QuizState = {
+    status: string;
+    current_index: number;
+    total: number;
+    question?: { q: string; options: string[] } | null;
+    my_answer?: number | null;
+    leaderboard?: { name: string; points: number }[];
+};
 type SessionProps = {
     code: string;
     status: string;
@@ -29,6 +37,7 @@ type SessionProps = {
     groups: Group[];
     me: Me;
     config: { rules: Record<string, unknown>; fields: Field[]; plugins?: string[] };
+    quiz?: QuizState | null;
 };
 
 const CHANNEL_EVENTS = ['SessionConfigUpdated', 'SessionStateUpdated', 'GroupCreated', 'SessionDeleted'];
@@ -65,26 +74,38 @@ export default function Show({ session }: { session: SessionProps }) {
         if (data.config.rules.chat_enabled) {
             fetch(`/s/${data.code}/messages`, { headers: { 'X-Device-Token': deviceToken } })
                 .then((r) => (r.ok ? r.json() : null))
-                .then((json) => { if (json) setMessages(json.messages); });
+                .then((json) => {
+ if (json) {
+setMessages(json.messages);
+} 
+});
         }
+
         const seq = ++seqRef.current;
         fetch(`/api/sessions/${data.code}/board`, { headers: { 'X-Device-Token': deviceToken } })
             .then((r) => {
                 if (r.status === 404) {
                     setGone(true);
+
                     return null;
                 }
+
                 return r.ok ? r.json() : null;
             })
             .then((json) => {
-                if (json && seq === seqRef.current) setBoard(json as SessionProps);
+                if (json && seq === seqRef.current) {
+setBoard(json as SessionProps);
+}
             });
     };
     refetchRef.current = refetch;
 
     // 2-5: live events → refetch the snapshot; membership events flash the card (AD-6)
     useEffect(() => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined') {
+return;
+}
+
         configureGroupifyEcho({ deviceToken });
         const channel = echo().channel(`session.${data.code}`);
         CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, () => refetchRef.current()));
@@ -103,20 +124,22 @@ export default function Show({ session }: { session: SessionProps }) {
         channel.listen('MembershipChanged', (e: { group_id: number; action: string }) => {
             if (e.action === 'joined' || e.action === 'left') {
                 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
                 if (!reduced) {
                     setFlash({ groupId: e.group_id, kind: e.action });
                     window.setTimeout(() => setFlash(null), 1200);
                 }
             }
+
             refetchRef.current();
         });
+
         return () => {
             CHANNEL_EVENTS.forEach((ev) => channel.stopListening(ev));
             channel.stopListening('MembershipChanged');
             echo().leaveChannel(`session.${data.code}`);
-            presence.leave();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [data.code, deviceToken]);
 
     // F6: never leave the device token in the address bar (history/referrer leak)
@@ -128,8 +151,12 @@ export default function Show({ session }: { session: SessionProps }) {
 
     // Auto-dissolve countdown ticker
     useEffect(() => {
-        if (!data.dissolve_at) return;
+        if (!data.dissolve_at) {
+return;
+}
+
         const t = window.setInterval(() => setNowTick(Date.now()), 1000);
+
         return () => window.clearInterval(t);
     }, [data.dissolve_at]);
 
@@ -139,6 +166,7 @@ export default function Show({ session }: { session: SessionProps }) {
         if (status === 'connected' && prevStatus.current !== 'connected') {
             refetch();
         }
+
         prevStatus.current = status;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status]);
@@ -162,8 +190,10 @@ export default function Show({ session }: { session: SessionProps }) {
                 if (r.ok) {
                     setActionError(null);
                     refetch();
+
                     return;
                 }
+
                 return r
                     .json()
                     .then((j) => setActionError(j.message ?? 'Something went wrong.'))
@@ -174,13 +204,22 @@ export default function Show({ session }: { session: SessionProps }) {
 
     const groups = useMemo(() => {
         const q = query.trim().toLowerCase();
+
         return data.groups.filter((g) => {
-            if (openOnly && g.open_slots <= 0) return false;
-            if (!q) return true;
+            if (openOnly && g.open_slots <= 0) {
+return false;
+}
+
+            if (!q) {
+return true;
+}
+
             const topic = Object.values(g.field_values).join(' ').toLowerCase();
+
             return g.name.toLowerCase().includes(q) || topic.includes(q);
         });
     }, [data.groups, query, openOnly]);
+
     if (gone) {
         return (
             <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-surface px-6 text-on-surface">
@@ -207,6 +246,19 @@ export default function Show({ session }: { session: SessionProps }) {
 
     const meIn = data.me ? data.groups.find((g) => g.members.some((m) => m.id === data.me?.id)) : undefined;
     const detailGroup = detailGroupId === null ? null : data.groups.find((g) => g.id === detailGroupId) ?? null;
+    const roomMessages = messages.filter((message) => message.scope === 'global' || message.scope === 'announcement');
+    const detailGroupMessages = detailGroup
+        ? messages.filter((message) => message.scope === 'group' && message.group_id === detailGroup.id)
+        : [];
+    const detailMember = detailGroup && data.me ? detailGroup.members.some((member) => member.id === data.me?.id) : false;
+    const chatEnabled = Boolean(data.config.rules.chat_enabled);
+    const canPostToDetailGroup = Boolean(
+        chatEnabled
+        && detailGroup
+        && detailMember
+        && (data.config.rules.group_chat_mode !== 'leader' || detailGroup.leader_id === data.me?.id),
+    );
+    const globalChatMode = String(data.config.rules.global_chat_mode ?? 'open');
     const submitCreate = () => {
         mutate(`/s/${data.code}/groups`, { name: createName, field_values: fieldValues });
         setCreating(false);
@@ -441,7 +493,7 @@ export default function Show({ session }: { session: SessionProps }) {
 
                         <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                             {data.quiz.question?.options.map((opt: string, oi: number) => {
-                                const answered = data.quiz.my_answer !== null && data.quiz.my_answer !== undefined;
+                                const answered = data.quiz!.my_answer !== null && data.quiz!.my_answer !== undefined;
                                 const isLeader =
                                     data.me && data.me.id === (data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.leader_id ?? -1);
                                 const isPick = quizPick === oi || data.quiz?.my_answer === oi;
@@ -450,11 +502,14 @@ export default function Show({ session }: { session: SessionProps }) {
                                     <button
                                         key={oi}
                                         type="button"
-                                        disabled={!isLeader || answered}
+                                        disabled={data.quiz?.status !== 'live' || !isLeader || answered}
                                         onClick={() => {
                                             setQuizPick(oi);
                                             const gid = data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.id;
-                                            if (gid) mutate(`/s/${data.code}/groups/${gid}/quiz/answer`, { question_index: data.quiz.current_index, answer_index: oi });
+
+                                            if (gid) {
+                                            mutate(`/s/${data.code}/groups/${gid}/quiz/answer`, { question_index: data.quiz!.current_index, answer_index: oi });
+}
                                         }}
                                         className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
                                             isPick
@@ -760,22 +815,42 @@ export default function Show({ session }: { session: SessionProps }) {
 
                             <section className="mt-6 flex flex-1 flex-col">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-on-surface-variant">Group chat</h3>
-                                    {!data.config.rules.chat_enabled && <span className="font-mono text-[10px] text-on-surface-variant/60">Host has disabled chat</span>}
+                                    <div>
+                                        <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-on-surface-variant">Group chat</h3>
+                                        <p className="mt-1 text-[10px] text-on-surface-variant/65">Private to {detailGroup.name}; room chat is separate.</p>
+                                    {!chatEnabled && <span className="font-mono text-[10px] text-on-surface-variant/60">Disabled</span>}
+                                    {chatEnabled && !detailMember && <span className="font-mono text-[10px] text-on-surface-variant/60">Members only</span>}
+                                    {chatEnabled && detailMember && !canPostToDetailGroup && <span className="font-mono text-[10px] text-on-surface-variant/60">Leader-only</span>}
+                                    </div>
                                 </div>
                                 <div className="mt-3 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-[#060e20] p-3">
-                                    {data.config.rules.chat_enabled ? messages.filter((message) => message.scope === 'group' && message.group_id === detailGroup.id).map((message) => (
+                                    {!chatEnabled ? (
+                                        <p className="py-8 text-center text-xs text-on-surface-variant/60">Ask the host to enable group messaging.</p>
+                                    ) : detailGroupMessages.length === 0 ? (
+                                        <p className="py-8 text-center text-xs text-on-surface-variant/60">No messages in this group yet.</p>
+                                    ) : detailGroupMessages.map((message) => (
                                         <div key={message.id} className="rounded-lg bg-surface-container-low p-2.5 text-xs">
-                                            <div className="flex justify-between gap-2"><strong className="text-secondary">{message.author}</strong><span className="font-mono text-on-surface-variant/50">{new Date(message.at).toLocaleTimeString()}</span></div>
+                                            <div className="flex justify-between gap-2"><strong className="text-primary">{message.author}</strong><span className="font-mono text-on-surface-variant/50">{new Date(message.at).toLocaleTimeString()}</span></div>
                                             <p className="mt-1 text-on-surface">{message.body}</p>
                                         </div>
-                                    )) : <p className="py-8 text-center text-xs text-on-surface-variant/60">Ask the host to enable messaging in Configuration.</p>}
-                                    {data.config.rules.chat_enabled && messages.filter((message) => message.scope === 'group' && message.group_id === detailGroup.id).length === 0 && <p className="py-8 text-center text-xs text-on-surface-variant/60">No group messages yet. Start the conversation.</p>}
+                                    ))}
                                 </div>
-                                {data.config.rules.chat_enabled && meIn && (
+                                {canPostToDetailGroup && (
                                     <div className="mt-3 flex gap-2">
-                                        <input type="text" value={groupDraft} placeholder={`Message ${detailGroup.name}…`} onChange={(event) => setGroupDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && groupDraft.trim()) { const body = groupDraft.trim(); setGroupDraft(''); mutate(`/s/${data.code}/messages`, { scope: 'group', group_id: detailGroup.id, body }); } }} className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3 py-2.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:outline-none" />
-                                        <button type="button" onClick={() => { const body = groupDraft.trim(); if (!body) return; setGroupDraft(''); mutate(`/s/${data.code}/messages`, { scope: 'group', group_id: detailGroup.id, body }); }} className="rounded-xl bg-primary-container px-3 text-on-primary-container hover:brightness-110" aria-label="Send group message"><span className="material-symbols-outlined text-[17px]">send</span></button>
+                                        <input type="text" value={groupDraft} placeholder={`Message ${detailGroup.name}…`} onChange={(event) => setGroupDraft(event.target.value)} onKeyDown={(event) => {
+ if (event.key === 'Enter' && groupDraft.trim()) {
+ const body = groupDraft.trim(); setGroupDraft(''); mutate(`/s/${data.code}/messages`, { scope: 'group', group_id: detailGroup.id, body }); 
+} 
+}} className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3 py-2.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:outline-none" />
+                                        <button type="button" onClick={() => {
+ const body = groupDraft.trim();
+
+ if (!body) {
+return;
+}
+
+ setGroupDraft(''); mutate(`/s/${data.code}/messages`, { scope: 'group', group_id: detailGroup.id, body }); 
+}} className="rounded-xl bg-primary-container px-3 text-on-primary-container hover:brightness-110" aria-label="Send group message"><span className="material-symbols-outlined text-[17px]">send</span></button>
                                     </div>
                                 )}
                             </section>
@@ -787,7 +862,7 @@ export default function Show({ session }: { session: SessionProps }) {
 
 
                 {/* Chat Drawer */}
-                {data.config.rules.chat_enabled && (
+                {chatEnabled && (
                     <section className="mt-8">
                         <button
                             type="button"
@@ -801,84 +876,71 @@ export default function Show({ session }: { session: SessionProps }) {
 
                         {chatOpen && (
                             <div className="glass-panel mt-3 rounded-2xl p-4 shadow-2xl backdrop-blur-xl">
-                                <div className="max-h-64 space-y-2.5 overflow-y-auto pr-2">
-                                    {messages.length === 0 && (
-                                        <p className="py-6 text-center font-mono text-xs text-on-surface-variant/50">
-                                            No messages yet. Say hello to the room!
-                                        </p>
+                                <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+                                    <div>
+                                        <h2 className="font-display text-base font-bold text-on-surface">Room chat</h2>
+                                        <p className="mt-1 text-[11px] text-on-surface-variant">Shared with everyone in this session.</p>
+                                    </div>
+                                    <span className="rounded-full bg-secondary/10 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-secondary">
+                                        {globalChatMode === 'moderated' ? 'Moderated' : globalChatMode === 'muted' ? 'Read only' : 'Open'}
+                                    </span>
+                                </div>
+                                <div className="mt-4 max-h-64 space-y-2.5 overflow-y-auto pr-2">
+                                    {roomMessages.length === 0 && (
+                                        <p className="py-6 text-center font-mono text-xs text-on-surface-variant/50">No room messages yet. Start the conversation.</p>
                                     )}
-                                    {messages.map((m) => (
-                                        <div key={m.id} className="rounded-lg bg-[#060e20]/60 p-2.5 text-xs">
+                                    {roomMessages.map((message) => (
+                                        <div key={message.id} className="rounded-lg bg-[#060e20]/60 p-2.5 text-xs">
                                             <div className="flex items-center justify-between gap-2">
-                                                <span className="font-bold text-secondary">{m.author}</span>
+                                                <span className="font-bold text-secondary">{message.author}</span>
                                                 <span className="font-mono text-[10px] text-on-surface-variant/60">
-                                                    {new Date(m.at).toLocaleTimeString()}
+                                                    {message.scope === 'announcement' ? 'Announcement · ' : ''}{new Date(message.at).toLocaleTimeString()}
                                                 </span>
                                             </div>
-                                            <p className="mt-1 text-on-surface">{m.body}</p>
+                                            <p className="mt-1 text-on-surface">{message.body}</p>
                                         </div>
                                     ))}
                                 </div>
 
-                                <div className="mt-4 flex flex-col gap-2.5">
-                                    <div className="flex gap-2">
+                                {globalChatMode === 'muted' ? (
+                                    <p className="mt-4 rounded-xl border border-white/10 bg-surface-container-lowest px-3.5 py-2.5 text-xs text-on-surface-variant">
+                                        Room chat is read-only. Use your group detail panel for private team messages.
+                                    </p>
+                                ) : (
+                                    <div className="mt-4 flex gap-2">
                                         <input
                                             type="text"
-                                            placeholder="Post to the room…"
+                                            placeholder={globalChatMode === 'moderated' ? 'Post to the room for review…' : 'Post to the room…'}
                                             value={globalDraft}
                                             onChange={(e) => setGlobalDraft(e.target.value)}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter' && globalDraft.trim()) {
-                                                    const body = globalDraft;
+                                                    const body = globalDraft.trim();
                                                     setGlobalDraft('');
-                                                    void fetch(`/s/${data.code}/messages`, {
-                                                        method: 'POST',
-                                                        headers: {
-                                                            'Content-Type': 'application/json',
-                                                            Accept: 'application/json',
-                                                            'X-Device-Token': deviceToken,
-                                                            'X-XSRF-TOKEN': decodeURIComponent(
-                                                                document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
-                                                            ),
-                                                        },
-                                                        body: JSON.stringify({ scope: 'global', body }),
-                                                    }).then((r) => { if (r.ok) refetch(); });
+                                                    mutate(`/s/${data.code}/messages`, { scope: 'global', body });
                                                 }
                                             }}
                                             className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3.5 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-secondary focus:outline-none transition-all"
                                         />
-                                    </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const body = globalDraft.trim();
 
-                                    {meIn && (
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder={`Message ${meIn.name}…`}
-                                                value={groupDraft}
-                                                onChange={(e) => setGroupDraft(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' && groupDraft.trim()) {
-                                                        const body = groupDraft;
-                                                        setGroupDraft('');
-                                                        void fetch(`/s/${data.code}/messages`, {
-                                                            method: 'POST',
-                                                            headers: {
-                                                                'Content-Type': 'application/json',
-                                                                Accept: 'application/json',
-                                                                'X-Device-Token': deviceToken,
-                                                                'X-XSRF-TOKEN': decodeURIComponent(
-                                                                    document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
-                                                                ),
-                                                            },
-                                                            body: JSON.stringify({ scope: 'group', group_id: meIn.id, body }),
-                                                        }).then((r) => { if (r.ok) refetch(); });
-                                                    }
-                                                }}
-                                                className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3.5 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:outline-none transition-all"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
+                                                if (!body) {
+return;
+}
+
+                                                setGlobalDraft('');
+                                                mutate(`/s/${data.code}/messages`, { scope: 'global', body });
+                                            }}
+                                            className="rounded-xl bg-secondary px-3 text-on-secondary hover:brightness-110"
+                                            aria-label="Send room message"
+                                        >
+                                            <span className="material-symbols-outlined text-[17px]">send</span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </section>
@@ -900,7 +962,7 @@ export default function Show({ session }: { session: SessionProps }) {
                     <span className="font-mono text-[10px] whitespace-nowrap">Live Room</span>
                 </button>
 
-                {data.config.rules.chat_enabled && (
+                {chatEnabled && (
                     <button
                         type="button"
                         onClick={() => setChatOpen((o) => !o)}

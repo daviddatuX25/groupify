@@ -1,37 +1,57 @@
 import { echo } from '@laravel/echo-react';
-import ComingNext from '@/components/ComingNext';
-import { configureGroupifyEcho } from '@/lib/echo';
-import ConfigEditor from './ConfigEditor';
-import PluginsPanel from './PluginsPanel';
-import PermsEditor from './PermsEditor';
+import QRCode from 'qrcode';
+import { useEffect, useState } from 'react';
+import MemberActionDialog from '@/components/MemberActionDialog';
 import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
-import { useEffect, useState } from 'react';
-import QRCode from 'qrcode';
+import { configureGroupifyEcho } from '@/lib/echo';
+import ConfigEditor from './ConfigEditor';
+import PermsEditor from './PermsEditor';
+import PluginsPanel from './PluginsPanel';
 
-type Member = { id: number; name: string; role: string };
+type Member = { id: number; name: string; role: string; custom_role?: string | null };
 type Group = {
     id: number;
     name: string;
     leader_id: number | null;
+    pending?: { id: number; name: string }[];
     member_count: number;
     capacity: number;
     open_slots: number;
     field_values: Record<string, string>;
     members: Member[];
 };
-
+type QuizQuestion = { q: string; options: string[]; answer: number; points: number };
+type BoardConfig = {
+    rules: Record<string, unknown>;
+    fields?: unknown[];
+    plugins?: string[];
+    perms?: Record<string, Record<string, boolean>>;
+    roles?: Record<string, string[]>;
+    quiz?: { questions?: QuizQuestion[] };
+};
 type Board = {
     code: string;
     status: string;
     presence: number;
-    pool: { id: number; name: string }[];
+    pool: { id: number; name: string; custom_role?: string | null }[];
     groups: Group[];
-    config: { rules: Record<string, unknown> };
+    config: BoardConfig;
     is_admin: boolean;
+    quiz?: { status: string; current_index: number; total: number } | null;
+};
+type AdminMessage = {
+    id: number;
+    scope: 'global' | 'announcement' | 'group';
+    group_id?: number | null;
+    author: string;
+    body: string;
+    at: string;
 };
 
-const CHANNEL_EVENTS = ['SessionConfigUpdated', 'SessionStateUpdated', 'GroupCreated', 'MembershipChanged', 'SessionDeleted'];
+const blankQuizQuestion = (): QuizQuestion => ({ q: '', options: ['', '', '', ''], answer: 0, points: 10 });
+
+const CHANNEL_EVENTS = ['SessionConfigUpdated', 'SessionStateUpdated', 'GroupCreated', 'MembershipChanged', 'SessionDeleted', 'MessageCreated'];
 
 export default function Show({
     session,
@@ -53,26 +73,28 @@ export default function Show({
     const [showJoinInfo, setShowJoinInfo] = useState(true);
     const [showBoard, setShowBoard] = useState(true);
     const [activity, setActivity] = useState<{ type: string; payload: Record<string, unknown>; at: string }[]>([]);
-    const [timerMin, setTimerMin] = useState('');
-    const [guestListText, setGuestListText] = useState('');
     const [templateName, setTemplateName] = useState('');
     const [announceDraft, setAnnounceDraft] = useState('');
     const [proxyNames, setProxyNames] = useState('');
-    const [quizDraft, setQuizDraft] = useState([{ q: '', options: ['', '', '', ''], answer: 0, points: 10 }]);
+    const [quizDraft, setQuizDraft] = useState<QuizQuestion[]>(() => session.config.quiz?.questions ?? [blankQuizQuestion()]);
     const [modQueue, setModQueue] = useState<{ id: number; scope: string; author: string; body: string }[]>([]);
+    const [adminMessages, setAdminMessages] = useState<AdminMessage[]>([]);
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
     const [liveCount, setLiveCount] = useState<number | null>(null);
     const [joinBase, setJoinBase] = useState('');
-    const [tab, setTab] = useState<'grid' | 'config' | 'perms' | 'plugins' | 'templates'>('grid');
-
-    // Persist the admin token from the server prop (AD-3); subsequent loads read it.
-    if (typeof window !== 'undefined' && session.admin_token) {
-        window.localStorage.setItem('groupify.admin_token', session.admin_token);
-    }
+    const [createGroupOpen, setCreateGroupOpen] = useState(false);
+    const [timerMin, setTimerMin] = useState('');
+    const [guestListText, setGuestListText] = useState('');
+    const [createGroupName, setCreateGroupName] = useState('');
+    const [createGroupCapacity, setCreateGroupCapacity] = useState('');
+    const [groupView, setGroupView] = useState<'cards' | 'table'>('cards');
+    const [selectedParticipantIds, setSelectedParticipantIds] = useState<number[]>([]);
+    const [memberDialog, setMemberDialog] = useState<{ action: 'move' | 'role' | 'ban'; ids: number[] } | null>(null);
+    const [memberActionBusy, setMemberActionBusy] = useState(false);
+    const [tab, setTab] = useState<'grid' | 'config' | 'perms' | 'plugins' | 'chat' | 'templates'>('grid');
 
     const adminToken =
-        typeof window === 'undefined' ? '' : (window.localStorage.getItem('groupify.admin_token') ?? '');
-
+        typeof window === 'undefined' ? (session.admin_token ?? '') : (session.admin_token ?? window.localStorage.getItem('groupify.admin_token') ?? '');
     useEffect(() => {
         if (typeof window !== 'undefined' && window.location.search.includes('token=')) {
             window.history.replaceState({}, '', window.location.pathname);
@@ -87,25 +109,114 @@ export default function Show({
         fetch(`/api/sessions/${data.code}/board`, { headers: { 'X-Admin-Token': adminToken } })
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => {
-                if (json) setBoard(json as Board);
+                if (json) {
+setBoard(json as Board);
+}
             })
             .catch(() => setActionError('Board sync failed — reconnecting…'));
         fetch(`/admin/sessions/${session.id}/activity`, { headers: { 'X-Admin-Token': adminToken } })
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => {
-                if (json) setActivity(json.events);
+                if (json) {
+setActivity(json.events);
+}
             })
             .catch(() => {});
         fetch(`/admin/sessions/${session.id}/messages/pending`, { headers: { 'X-Admin-Token': adminToken } })
             .then((r) => (r.ok ? r.json() : null))
-            .then((json) => { if (json) setModQueue(json.messages); })
+            .then((json) => {
+ if (json) {
+setModQueue(json.messages);
+} 
+})
+            .catch(() => {});
+        fetch(`/admin/sessions/${session.id}/messages`, { headers: { 'X-Admin-Token': adminToken } })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) => {
+ if (json) {
+setAdminMessages(json.messages as AdminMessage[]);
+} 
+})
             .catch(() => {});
         fetch(`/admin/sessions/${session.id}/templates`, { headers: { 'X-Admin-Token': adminToken } })
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => {
-                if (json) setTemplates(json.templates);
+                if (json) {
+setTemplates(json.templates);
+}
             })
             .catch(() => {});
+    };
+    const managedParticipants = [
+        ...data.pool.map((participant) => ({ id: participant.id, name: participant.name, groupName: 'Unassigned pool' })),
+        ...data.groups.flatMap((group) => group.members.map((member) => ({ id: member.id, name: member.name, groupName: group.name }))),
+    ];
+    const participantIds = managedParticipants.map((participant) => participant.id);
+    const allParticipantsSelected = participantIds.length > 0 && participantIds.every((id) => selectedParticipantIds.includes(id));
+    const roleNames = Object.keys((data.config.roles ?? {}) as Record<string, string[]>);
+
+    const toggleParticipant = (id: number) => {
+        setSelectedParticipantIds((current) => (current.includes(id) ? current.filter((selected) => selected !== id) : [...current, id]));
+    };
+
+    const toggleAllParticipants = () => {
+        setSelectedParticipantIds(allParticipantsSelected ? [] : participantIds);
+    };
+
+    const openMemberAction = (action: 'move' | 'role' | 'ban', ids: number[]) => {
+        setMemberDialog({ action, ids });
+    };
+
+    const confirmMemberAction = async (value: string) => {
+        if (memberDialog === null || memberActionBusy) return;
+
+        setMemberActionBusy(true);
+        const xsrf = document.cookie
+            .split('; ')
+            .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
+            ?.split('=')[1];
+
+        try {
+            const responses = await Promise.all(
+                memberDialog.ids.map((id) => {
+                    const endpoint =
+                        memberDialog.action === 'move'
+                            ? `/admin/sessions/${session.id}/members/${id}/move`
+                            : memberDialog.action === 'role'
+                              ? `/admin/sessions/${session.id}/members/${id}/role`
+                              : `/admin/sessions/${session.id}/members/${id}/ban`;
+                    const payload =
+                        memberDialog.action === 'move'
+                            ? { to_group_id: value === 'pool' ? null : Number(value) }
+                            : memberDialog.action === 'role'
+                              ? { role: value === '' ? null : value }
+                              : { banned: true };
+
+                    return fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json',
+                            'X-Admin-Token': adminToken,
+                            ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : {}),
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                }),
+            );
+
+            if (responses.some((response) => !response.ok)) {
+                throw new Error('One or more participant actions failed.');
+            }
+
+            setSelectedParticipantIds([]);
+            setMemberDialog(null);
+            refetch();
+        } catch {
+            setActionError('Participant action failed — try again.');
+        } finally {
+            setMemberActionBusy(false);
+        }
     };
 
     // QR drawn on mount + whenever the canvas (re)mounts (F3: toggling join
@@ -125,7 +236,10 @@ export default function Show({
     // Persist token (AD-3) + live subscription (AD-6)
     useEffect(() => {
         try {
-            if (typeof window === 'undefined') return;
+            if (typeof window === 'undefined') {
+return;
+}
+
             window.localStorage.setItem('groupify.admin_token', adminToken);
             configureGroupifyEcho({ adminToken });
             const channel = echo().channel(`session.${data.code}`);
@@ -136,27 +250,27 @@ export default function Show({
             presence.joining(() => setLiveCount((c) => (c === null ? c : c + 1)));
             presence.leaving(() => setLiveCount((c) => (c === null ? c : Math.max(0, c - 1))));
             setReady(true);
+
             return () => {
                 CHANNEL_EVENTS.forEach((ev) => channel.stopListening(ev));
                 echo().leaveChannel(`session.${data.code}`);
-                presence.leave();
             };
         } catch (err) {
-            // eslint-disable-next-line no-console
+             
             console.error('[Admin/Show] effect failed', err);
-            window.__adminEffectError = String(err);
+            (window as Window & { __adminEffectError?: string }).__adminEffectError = String(err);
             setReady(true); // render so the error is visible in the page
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.code, adminToken]);
 
-    const act = (url: string, payload: Record<string, unknown> = {}) => {
+    const act = (url: string, payload: Record<string, unknown> = {}, method: 'POST' | 'PUT' = 'POST') => {
         const xsrf = document.cookie
             .split('; ')
             .find((c) => c.startsWith('XSRF-TOKEN='))
             ?.split('=')[1];
         void fetch(url, {
-            method: 'POST',
+            method,
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
@@ -165,8 +279,21 @@ export default function Show({
             },
             body: JSON.stringify(payload),
         }).then((r) => {
-            if (r.ok) refetch();
+            if (r.ok) {
+refetch();
+}
         });
+    };
+    const createAdminGroup = () => {
+        const name = createGroupName.trim();
+        const capacity = createGroupCapacity === '' ? undefined : Number(createGroupCapacity);
+        act(`/admin/sessions/${session.id}/groups`, {
+            ...(name ? { name } : {}),
+            ...(capacity ? { capacity } : {}),
+        });
+        setCreateGroupName('');
+        setCreateGroupCapacity('');
+        setCreateGroupOpen(false);
     };
 
     const patchState = (action: string) => {
@@ -188,8 +315,10 @@ export default function Show({
                 if (r.ok) {
                     setActionError(null);
                     refetch();
+
                     return;
                 }
+
                 return r
                     .json()
                     .then((j) => setActionError(j.message ?? `Request failed (${r.status}).`))
@@ -207,18 +336,32 @@ export default function Show({
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             const t = e.target as HTMLElement | null;
-            if (t && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable)) return;
-            if (e.key === 'i') setShowJoinInfo((v) => !v);
-            if (e.key === 'h') setShowBoard((v) => !v);
+
+            if (t && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable)) {
+return;
+}
+
+            if (e.key === 'i') {
+setShowJoinInfo((v) => !v);
+}
+
+            if (e.key === 'h') {
+setShowBoard((v) => !v);
+}
         };
         window.addEventListener('keydown', onKey);
+
         return () => window.removeEventListener('keydown', onKey);
     }, []);
 
-    if (!ready) return null;
+    if (!ready) {
+return null;
+}
 
     const frozen = data.config.rules.freeze as boolean;
     const topicsSet = data.groups.filter((g) => Object.values(g.field_values).some((v) => v)).length;
+    const minGroupCapacity = Math.max(1, Number(data.config.rules.min_members ?? 1));
+    const maxGroupCapacity = Math.max(minGroupCapacity, Number(data.config.rules.max_members ?? 5));
 
     return (
         <div className="relative min-h-screen bg-[#020618] font-sans text-on-surface antialiased selection:bg-primary/30">
@@ -245,6 +388,7 @@ export default function Show({
                                 ['grid', 'grid_view', 'Live Grid'],
                                 ['config', 'tune', 'Configuration'],
                                 ['perms', 'admin_panel_settings', 'Permissions'],
+                                ['chat', 'forum', 'Chat monitor'],
                                 ['plugins', 'widgets', 'Plugins'],
                                 ['templates', 'history', 'Templates & Activity'],
                             ] as const
@@ -252,7 +396,12 @@ export default function Show({
                             <button
                                 key={key}
                                 type="button"
-                                onClick={() => setTab(key)}
+                                onClick={() => {
+                                    setTab(key);
+                                    if (key === 'chat') {
+                                        refetch();
+                                    }
+                                }}
                                 className={`flex items-center gap-3 rounded-xl p-3 font-sans text-sm transition-all ${
                                     tab === key
                                         ? 'bg-surface-variant/40 font-semibold text-secondary shadow-[0_0_12px_rgba(76,215,246,0.2)]'
@@ -270,6 +419,14 @@ export default function Show({
                         ))}
                     </nav>
                 </div>
+                    <button
+                        type="button"
+                        onClick={() => setCreateGroupOpen((open) => !open)}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-secondary/35 bg-secondary/10 py-3 font-mono text-xs font-bold uppercase tracking-wider text-secondary transition-colors hover:bg-secondary/20"
+                    >
+                        <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                        <span>Create Group</span>
+                    </button>
 
                 <div className="flex flex-col gap-3">
                     <button
@@ -288,7 +445,7 @@ export default function Show({
             </aside>
 
             {/* Main Content Dashboard */}
-            <main className="relative z-10 flex-1 p-4 pb-40 md:p-8 lg:ml-64">
+            <main className="relative z-10 flex-1 p-4 pb-40 md:p-8 md:pb-48 lg:ml-64 lg:pb-40">
                 <div className="mx-auto w-full max-w-7xl">
                     {/* Error Banner */}
                     {actionError && (
@@ -326,6 +483,7 @@ export default function Show({
                                 ['grid', 'Live Grid'],
                                 ['config', 'Config'],
                                 ['perms', 'Perms'],
+                                ['chat', 'Chat'],
                                 ['plugins', 'Plugins'],
                                 ['templates', 'History'],
                             ] as const
@@ -333,7 +491,12 @@ export default function Show({
                             <button
                                 key={key}
                                 type="button"
-                                onClick={() => setTab(key)}
+                                onClick={() => {
+                                    setTab(key);
+                                    if (key === 'chat') {
+                                        refetch();
+                                    }
+                                }}
                                 className={`shrink-0 rounded-lg px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wide transition-colors ${
                                     tab === key ? 'bg-secondary/20 text-secondary' : 'text-on-surface-variant'
                                 }`}
@@ -461,7 +624,11 @@ export default function Show({
                                                         ),
                                                     },
                                                     body: JSON.stringify({ rules: { auto_dissolve_minutes: v === '' ? null : Number(v) } }),
-                                                }).then((r) => { if (r.ok) { refetch(); setTimerMin(''); } });
+                                                }).then((r) => {
+ if (r.ok) {
+ refetch(); setTimerMin(''); 
+} 
+});
                                             }}
                                             className="rounded-xl border border-white/10 bg-surface-variant/40 px-3 py-2 font-mono text-xs font-semibold text-on-surface transition-all hover:bg-surface-variant"
                                         >
@@ -495,7 +662,11 @@ export default function Show({
                                                         ),
                                                     },
                                                     body: JSON.stringify({ rules: { guest_list: names } }),
-                                                }).then((r) => { if (r.ok) { refetch(); setGuestListText(''); } });
+                                                }).then((r) => {
+ if (r.ok) {
+ refetch(); setGuestListText(''); 
+} 
+});
                                             }}
                                             className="rounded-xl border border-white/10 bg-surface-variant/40 px-3 py-2 font-mono text-xs font-semibold text-on-surface transition-all hover:bg-surface-variant shrink-0"
                                         >
@@ -530,23 +701,131 @@ export default function Show({
                     {/* Live Groups Grid */}
                     {showBoard && tab === 'grid' && (
                         <>
-                            <div className="mb-4 flex items-center justify-between">
-                                <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-secondary">
-                                    Active Groups ({data.groups.length})
-                                </h3>
-                                <button
-                                    type="button"
-                                    onClick={() => act(`/admin/sessions/${session.id}/auto-distribute`)}
-                                    disabled={data.pool.length === 0}
-                                    className="lg:hidden rounded-lg bg-primary-container px-3 py-1 font-mono text-xs font-bold text-black"
-                                >
-                                    Auto-Distribute
-                                </button>
+                            <div className="mb-4 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-secondary">
+                                        Active Groups ({data.groups.length})
+                                    </h3>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <label className="flex items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-on-surface-variant">
+                                            <input
+                                                type="checkbox"
+                                                checked={allParticipantsSelected}
+                                                onChange={toggleAllParticipants}
+                                                className="h-3.5 w-3.5 accent-primary"
+                                                aria-label="Select all participants"
+                                            />
+                                            Select all
+                                        </label>
+                                        <div className="flex rounded-lg border border-white/10 p-0.5" aria-label="Group view">
+                                            {(['cards', 'table'] as const).map((view) => (
+                                                <button
+                                                    key={view}
+                                                    type="button"
+                                                    aria-pressed={groupView === view}
+                                                    onClick={() => setGroupView(view)}
+                                                    className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold capitalize transition-colors ${
+                                                        groupView === view ? 'bg-secondary/20 text-secondary' : 'text-on-surface-variant hover:text-on-surface'
+                                                    }`}
+                                                >
+                                                    {view}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCreateGroupOpen((open) => !open)}
+                                            className="rounded-lg border border-secondary/35 bg-secondary/10 px-3 py-1.5 font-mono text-xs font-bold text-secondary transition-colors hover:bg-secondary/20"
+                                        >
+                                            + Create group
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => act(`/admin/sessions/${session.id}/auto-distribute`)}
+                                            disabled={data.pool.length === 0}
+                                            className="rounded-lg bg-primary-container px-3 py-1.5 font-mono text-xs font-bold text-black disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            Auto-Distribute
+                                        </button>
+                                    </div>
+                                </div>
+                                {selectedParticipantIds.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-secondary/25 bg-secondary/5 px-3 py-2.5">
+                                        <span className="mr-1 text-xs font-semibold text-secondary">{selectedParticipantIds.length} selected</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => openMemberAction('move', selectedParticipantIds)}
+                                            className="rounded-lg border border-white/10 bg-surface-container-lowest px-3 py-1.5 text-[11px] font-semibold text-on-surface hover:border-secondary/50"
+                                        >
+                                            Move
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => openMemberAction('role', selectedParticipantIds)}
+                                            disabled={roleNames.length === 0}
+                                            className="rounded-lg border border-white/10 bg-surface-container-lowest px-3 py-1.5 text-[11px] font-semibold text-on-surface hover:border-secondary/50 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            Assign role
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => openMemberAction('ban', selectedParticipantIds)}
+                                            className="rounded-lg border border-error/30 bg-error-container/15 px-3 py-1.5 text-[11px] font-semibold text-error hover:bg-error-container/30"
+                                        >
+                                            Ban
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedParticipantIds([])}
+                                            className="ml-auto px-2 py-1.5 text-[11px] text-on-surface-variant hover:text-on-surface"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                )}
                             </div>
+                            {createGroupOpen && (
+                                <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-secondary/25 bg-secondary/5 p-4 sm:flex-row sm:items-end">
+                                    <label className="flex-1">
+                                        <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Group name</span>
+                                        <input
+                                            value={createGroupName}
+                                            onChange={(e) => setCreateGroupName(e.target.value)}
+                                            placeholder="Optional — auto-name if blank"
+                                            className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none placeholder:text-on-surface-variant/45 focus:border-secondary"
+                                        />
+                                    </label>
+                                    <label className="sm:w-48">
+                                        <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Capacity</span>
+                                        <span className="relative block">
+                                            <select
+                                                value={createGroupCapacity}
+                                                onChange={(e) => setCreateGroupCapacity(e.target.value)}
+                                                className="w-full appearance-none rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 pr-8 text-xs text-on-surface outline-none focus:border-secondary"
+                                            >
+                                                <option value="">Session default ({minGroupCapacity}–{maxGroupCapacity})</option>
+                                                {Array.from({ length: maxGroupCapacity - minGroupCapacity + 1 }, (_, i) => minGroupCapacity + i).map((size) => (
+                                                    <option key={size} value={size}>{size} {size === 1 ? 'person' : 'people'}</option>
+                                                ))}
+                                            </select>
+                                            <span className="material-symbols-outlined pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant">expand_more</span>
+                                        </span>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={createAdminGroup}
+                                        className="rounded-xl bg-secondary px-4 py-2 font-display text-xs font-bold text-on-secondary hover:brightness-110"
+                                    >
+                                        Add empty group
+                                    </button>
+                                </div>
+                            )}
 
+                            {groupView === 'cards' ? (
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                                 {data.groups.map((g) => {
                                     const full = g.open_slots <= 0;
+
                                     return (
                                         <article
                                             key={g.id}
@@ -596,42 +875,46 @@ export default function Show({
                                                 <ul className="mt-3.5 space-y-2 text-xs text-on-surface">
                                                     {g.members.map((m) => (
                                                         <li key={m.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface-container-low/50 px-2 py-1.5">
-                                                            <div className="flex items-center gap-2 truncate">
+                                                            <div className="flex min-w-0 items-center gap-2">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedParticipantIds.includes(m.id)}
+                                                                    onChange={() => toggleParticipant(m.id)}
+                                                                    className="h-3.5 w-3.5 shrink-0 accent-primary"
+                                                                    aria-label={`Select ${m.name}`}
+                                                                />
                                                                 <span
                                                                     className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                                                                         m.role === 'leader' ? 'bg-primary shadow-[0_0_6px_#6dfc57]' : 'bg-on-surface-variant/40'
                                                                     }`}
                                                                 />
-                                                                <span className={m.role === 'leader' ? 'font-bold text-on-surface' : 'text-on-surface-variant'}>
+                                                                <span className={`truncate ${m.role === 'leader' ? 'font-bold text-on-surface' : 'text-on-surface-variant'}`}>
                                                                     {m.name}
                                                                 </span>
                                                                 {m.role === 'leader' && (
-                                                                    <span className="rounded bg-primary/15 px-1.5 py-0.2 font-mono text-[9px] font-bold text-primary">
-                                                                        lead
-                                                                    </span>
+                                                                    <span className="rounded bg-primary/15 px-1.5 py-0.2 font-mono text-[9px] font-bold text-primary">lead</span>
+                                                                )}
+                                                                {m.custom_role && (
+                                                                    <span className="hidden rounded bg-secondary/10 px-1.5 py-0.2 font-mono text-[9px] text-secondary sm:inline">{m.custom_role}</span>
                                                                 )}
                                                             </div>
-                                                            <select
-                                                                className="rounded-lg border border-white/10 bg-[#060e20] px-2 py-0.5 text-[11px] text-on-surface-variant outline-none focus:border-secondary"
-                                                                defaultValue=""
-                                                                onChange={(e) => {
-                                                                    const v = e.target.value;
-                                                                    if (v === '') return;
-                                                                    act(`/admin/sessions/${session.id}/members/${m.id}/move`, {
-                                                                        to_group_id: v === 'pool' ? null : Number(v),
-                                                                    });
-                                                                }}
-                                                            >
-                                                                <option value="">move…</option>
-                                                                <option value="pool">to pool</option>
-                                                                {data.groups
-                                                                    .filter((o) => o.id !== g.id)
-                                                                    .map((o) => (
-                                                                        <option key={o.id} value={o.id}>
-                                                                            to {o.name}
-                                                                        </option>
-                                                                    ))}
-                                                            </select>
+                                                            <div className="flex shrink-0 items-center gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openMemberAction('move', [m.id])}
+                                                                    className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-on-surface-variant hover:border-secondary/50 hover:text-secondary"
+                                                                >
+                                                                    Move
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openMemberAction('role', [m.id])}
+                                                                    disabled={roleNames.length === 0}
+                                                                    className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-on-surface-variant hover:border-secondary/50 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                                                                >
+                                                                    Role
+                                                                </button>
+                                                            </div>
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -657,6 +940,66 @@ export default function Show({
                                     </div>
                                 )}
                             </div>
+                            ) : (
+                                <div className="overflow-x-auto rounded-2xl border border-white/10 bg-surface-container-lowest">
+                                    <table className="w-full min-w-[680px] text-left text-xs">
+                                        <thead className="border-b border-white/10 bg-surface-container-low">
+                                            <tr>
+                                                <th className="w-12 px-4 py-3"><span className="sr-only">Select</span></th>
+                                                <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Group</th>
+                                                <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Participant</th>
+                                                <th className="px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Role</th>
+                                                <th className="px-4 py-3 text-right font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {data.groups.flatMap((group) =>
+                                                group.members.map((member) => (
+                                                    <tr key={`${group.id}-${member.id}`} className="border-b border-white/5 last:border-0">
+                                                        <td className="px-4 py-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedParticipantIds.includes(member.id)}
+                                                                onChange={() => toggleParticipant(member.id)}
+                                                                className="h-3.5 w-3.5 accent-primary"
+                                                                aria-label={`Select ${member.name}`}
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 font-semibold text-secondary">{group.name}</td>
+                                                        <td className="px-4 py-3 font-semibold text-on-surface">{member.name}</td>
+                                                        <td className="px-4 py-3 text-on-surface-variant">
+                                                            <span className={member.role === 'leader' ? 'font-semibold text-primary' : ''}>{member.role}</span>
+                                                            {member.custom_role && <span className="ml-2 text-secondary">· {member.custom_role}</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex justify-end gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openMemberAction('move', [member.id])}
+                                                                    className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-on-surface-variant hover:border-secondary/50 hover:text-secondary"
+                                                                >
+                                                                    Move
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openMemberAction('role', [member.id])}
+                                                                    disabled={roleNames.length === 0}
+                                                                    className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-on-surface-variant hover:border-secondary/50 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                                                                >
+                                                                    Role
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )),
+                                            )}
+                                        </tbody>
+                                    </table>
+                                    {managedParticipants.length === 0 && (
+                                        <p className="p-10 text-center text-xs text-on-surface-variant/60">Participants will appear here after they join.</p>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Pending requests panel (if any) */}
                             {data.groups.some((g) => (g as Group & { pending?: { id: number; name: string }[] }).pending?.length) && (
@@ -687,7 +1030,11 @@ export default function Show({
                                                                             document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
                                                                         ),
                                                                     },
-                                                                }).then((r) => { if (r.ok) refetch(); })
+                                                                }).then((r) => {
+ if (r.ok) {
+refetch();
+} 
+})
                                                             }
                                                             className="rounded-lg bg-primary-container px-3 py-1 font-bold text-on-primary-container hover:brightness-110"
                                                         >
@@ -706,7 +1053,11 @@ export default function Show({
                                                                             document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
                                                                         ),
                                                                     },
-                                                                }).then((r) => { if (r.ok) refetch(); })
+                                                                }).then((r) => {
+ if (r.ok) {
+refetch();
+} 
+})
                                                             }
                                                             className="rounded-lg bg-error-container/40 px-3 py-1 font-bold text-error hover:bg-error-container"
                                                         >
@@ -720,6 +1071,71 @@ export default function Show({
                                 </section>
                             )}
                         </>
+                    )}
+
+                    {/* ==== Scoped chat monitor ==== */}
+                    {tab === 'chat' && (
+                        <div className="space-y-6">
+                            <section className="glass-card rounded-2xl p-5 shadow-xl">
+                                <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+                                    <div>
+                                        <h3 className="font-display text-base font-bold text-on-surface">Room chat</h3>
+                                        <p className="mt-1 text-xs text-on-surface-variant">Global posts and facilitator announcements visible to the whole session.</p>
+                                    </div>
+                                    <span className="rounded-full bg-secondary/10 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-secondary">
+                                        {adminMessages.filter((message) => message.scope !== 'group').length} posts
+                                    </span>
+                                </div>
+                                <div className="mt-4 max-h-80 space-y-2 overflow-y-auto pr-1">
+                                    {adminMessages.filter((message) => message.scope !== 'group').map((message) => (
+                                        <article key={message.id} className="rounded-xl border border-white/10 bg-surface-container-lowest p-3">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="font-semibold text-secondary">{message.author}</span>
+                                                <span className="font-mono text-[10px] text-on-surface-variant/60">{message.scope === 'announcement' ? 'Announcement' : 'Global'} · {new Date(message.at).toLocaleTimeString()}</span>
+                                            </div>
+                                            <p className="mt-1.5 text-xs leading-relaxed text-on-surface">{message.body}</p>
+                                        </article>
+                                    ))}
+                                    {adminMessages.filter((message) => message.scope !== 'group').length === 0 && (
+                                        <p className="py-8 text-center text-xs text-on-surface-variant/60">No room messages yet.</p>
+                                    )}
+                                </div>
+                            </section>
+
+                            <section className="glass-card rounded-2xl p-5 shadow-xl">
+                                <div className="border-b border-white/10 pb-3">
+                                    <h3 className="font-display text-base font-bold text-on-surface">Group channels</h3>
+                                    <p className="mt-1 text-xs text-on-surface-variant">Each group is isolated; participants only receive their own channel.</p>
+                                </div>
+                                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                    {data.groups.map((group) => {
+                                        const groupMessages = adminMessages.filter((message) => message.scope === 'group' && message.group_id === group.id);
+
+                                        return (
+                                            <article key={group.id} className="rounded-xl border border-white/10 bg-surface-container-lowest p-4">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <h4 className="font-semibold text-on-surface">{group.name}</h4>
+                                                    <span className="font-mono text-[10px] text-on-surface-variant">{groupMessages.length} posts</span>
+                                                </div>
+                                                <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+                                                    {groupMessages.map((message) => (
+                                                        <div key={message.id} className="rounded-lg bg-surface-container-low p-2.5 text-xs">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="font-semibold text-primary">{message.author}</span>
+                                                                <span className="font-mono text-[10px] text-on-surface-variant/60">{new Date(message.at).toLocaleTimeString()}</span>
+                                                            </div>
+                                                            <p className="mt-1 text-on-surface">{message.body}</p>
+                                                        </div>
+                                                    ))}
+                                                    {groupMessages.length === 0 && <p className="py-4 text-center text-[11px] text-on-surface-variant/50">No posts in this channel.</p>}
+                                                </div>
+                                            </article>
+                                        );
+                                    })}
+                                    {data.groups.length === 0 && <p className="text-xs text-on-surface-variant/60">Groups will appear here as they are created.</p>}
+                                </div>
+                            </section>
+                        </div>
                     )}
 
                     {/* ==== Extensions tab ==== */}
@@ -755,7 +1171,11 @@ export default function Show({
                                                             ),
                                                         },
                                                         body: JSON.stringify({ scope: 'announcement', body }),
-                                                    }).then((r) => { if (r.ok) refetch(); });
+                                                    }).then((r) => {
+ if (r.ok) {
+refetch();
+} 
+});
                                                 }
                                             }}
                                             className="flex-1 rounded-xl border border-white/10 bg-surface-container-lowest px-4 py-2.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:border-secondary transition-all"
@@ -878,7 +1298,7 @@ export default function Show({
                                                                 answer: qq.answer,
                                                                 points: qq.points,
                                                             })),
-                                                    })
+                                                    }, 'PUT')
                                                 }
                                                 className="rounded-xl bg-secondary px-5 py-2 font-display text-xs font-bold text-on-secondary shadow-[0_0_15px_rgba(76,215,246,0.25)] hover:brightness-110"
                                             >
@@ -909,7 +1329,11 @@ export default function Show({
                                         type="button"
                                         onClick={() => {
                                             const names = proxyNames.split('\n').map((n) => n.trim()).filter(Boolean);
-                                            if (!names.length) return;
+
+                                            if (!names.length) {
+return;
+}
+
                                             act(`/admin/sessions/${session.id}/participants`, { names });
                                         }}
                                         className="h-fit shrink-0 rounded-xl bg-secondary px-5 py-3 font-display text-xs font-bold text-on-secondary shadow-[0_0_15px_rgba(76,215,246,0.25)] hover:brightness-110"
@@ -947,7 +1371,11 @@ export default function Show({
                                                                     ),
                                                                 },
                                                                 body: JSON.stringify({ action: 'approve' }),
-                                                            }).then((r) => { if (r.ok) refetch(); });
+                                                            }).then((r) => {
+ if (r.ok) {
+refetch();
+} 
+});
                                                         }}
                                                         className="rounded-lg bg-primary-container px-3 py-1 font-bold text-on-primary-container hover:brightness-110"
                                                     >
@@ -967,7 +1395,11 @@ export default function Show({
                                                                     ),
                                                                 },
                                                                 body: JSON.stringify({ action: 'reject' }),
-                                                            }).then((r) => { if (r.ok) refetch(); });
+                                                            }).then((r) => {
+ if (r.ok) {
+refetch();
+} 
+});
                                                         }}
                                                         className="rounded-lg bg-error-container/40 px-3 py-1 font-bold text-error hover:bg-error-container"
                                                     >
@@ -1011,6 +1443,10 @@ export default function Show({
                             defaults={session.perm_defaults ?? {}}
                             perms={(data.config.perms ?? {}) as Record<string, Record<string, boolean>>}
                             roles={(data.config.roles ?? {}) as Record<string, string[]>}
+                            participants={[
+                                ...data.pool,
+                                ...data.groups.flatMap((group) => group.members),
+                            ]}
                             onSaved={refetch}
                         />
                     )}
@@ -1038,7 +1474,11 @@ export default function Show({
                                     type="button"
                                     onClick={() => {
                                         const name = templateName.trim();
-                                        if (!name) return;
+
+                                        if (!name) {
+return;
+}
+
                                         void fetch(`/admin/sessions/${session.id}/templates`, {
                                             method: 'POST',
                                             headers: {
@@ -1050,7 +1490,11 @@ export default function Show({
                                                 ),
                                             },
                                             body: JSON.stringify({ name }),
-                                        }).then((r) => { if (r.ok) { setTemplateName(''); refetch(); } });
+                                        }).then((r) => {
+ if (r.ok) {
+ setTemplateName(''); refetch(); 
+} 
+});
                                     }}
                                     className="rounded-xl border border-white/10 bg-surface-variant/40 px-4 py-1.5 font-sans text-xs font-semibold text-on-surface hover:bg-surface-variant"
                                 >
@@ -1072,7 +1516,11 @@ export default function Show({
                                                             document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
                                                         ),
                                                     },
-                                                }).then((r) => { if (r.ok) refetch(); });
+                                                }).then((r) => {
+ if (r.ok) {
+refetch();
+} 
+});
                                             }}
                                             className="font-mono text-secondary hover:underline"
                                         >
@@ -1104,6 +1552,18 @@ export default function Show({
                 </div>
             </main>
 
+            {memberDialog && (
+                <MemberActionDialog
+                    action={memberDialog.action}
+                    members={managedParticipants.filter((participant) => memberDialog.ids.includes(participant.id))}
+                    groups={data.groups.map((group) => ({ id: group.id, name: group.name }))}
+                    roles={roleNames}
+                    onClose={() => {
+                        if (!memberActionBusy) setMemberDialog(null);
+                    }}
+                    onConfirm={confirmMemberAction}
+                />
+            )}
             {/* Docked Pool Bottom Bar */}
             <footer className="glass-card fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 p-4 shadow-2xl backdrop-blur-xl lg:left-64">
                 <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
@@ -1116,41 +1576,38 @@ export default function Show({
                                 key={p.id}
                                 className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#060e20] px-3 py-1 text-xs shadow-sm"
                             >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedParticipantIds.includes(p.id)}
+                                    onChange={() => toggleParticipant(p.id)}
+                                    className="h-3.5 w-3.5 accent-primary"
+                                    aria-label={`Select ${p.name}`}
+                                />
                                 <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_6px_#6dfc57]" />
                                 <span className="font-medium text-on-surface">{p.name}</span>
+                                {p.custom_role && <span className="font-mono text-[9px] text-secondary">{p.custom_role}</span>}
                                 <button
                                     type="button"
-                                    onClick={() => act(`/admin/sessions/${session.id}/members/${p.id}/ban`, { banned: true })}
-                                    className="rounded bg-error-container/30 px-1.5 py-0.2 font-mono text-[9px] text-error hover:bg-error-container/50"
+                                    onClick={() => openMemberAction('move', [p.id])}
+                                    className="rounded bg-surface-variant/60 px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant hover:text-secondary"
+                                >
+                                    move
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => openMemberAction('role', [p.id])}
+                                    disabled={roleNames.length === 0}
+                                    className="rounded bg-surface-variant/60 px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant hover:text-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    role
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => openMemberAction('ban', [p.id])}
+                                    className="rounded bg-error-container/30 px-1.5 py-0.5 font-mono text-[9px] text-error hover:bg-error-container/50"
                                 >
                                     ban
                                 </button>
-                                <select
-                                    className="rounded border border-white/10 bg-[#060e20] px-1.5 py-0.5 font-mono text-[10px] text-on-surface-variant outline-none"
-                                    value={p.custom_role ?? ''}
-                                    onChange={(e) => {
-                                        const v = e.target.value;
-                                        void fetch(`/admin/sessions/${session.id}/members/${p.id}/role`, {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                Accept: 'application/json',
-                                                'X-Admin-Token': adminToken,
-                                                'X-XSRF-TOKEN': decodeURIComponent(
-                                                    document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
-                                                ),
-                                            },
-                                            body: JSON.stringify({ role: v === '' ? null : v }),
-                                        }).then((r) => { if (r.ok) refetch(); });
-                                    }}
-                                >
-                                    <option value="">role…</option>
-                                    {Object.keys((data.config.roles ?? {}) as Record<string, string[]>).map((r) => (
-                                        <option key={r} value={r}>
-                                            {r}
-                                        </option>
-                                    ))}
-                                </select>
                             </span>
                         ))}
                         {data.pool.length === 0 && (

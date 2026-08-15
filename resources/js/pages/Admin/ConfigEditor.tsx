@@ -54,13 +54,16 @@ function Select({
     return (
         <label className="flex flex-col gap-1.5">
             <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{label}</span>
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface outline-none focus:border-secondary"
-            >
-                {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+            <span className="relative">
+                <select
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="w-full appearance-none rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 pr-9 text-xs text-on-surface outline-none transition-colors focus:border-secondary"
+                >
+                    {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+                <span className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant">expand_more</span>
+            </span>
             {hint && <span className="text-[10px] leading-relaxed text-on-surface-variant/70">ⓘ {hint}</span>}
         </label>
     );
@@ -80,6 +83,18 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
     const saveRules = () => onSave({ rules: draft });
     const saveFields = () => onSave({ fields: fieldDrafts.map((f) => ({ ...f })) });
 
+    const minMembers = Number(rule(draft, 'min_members', 1));
+    const maxMembers = Number(rule(draft, 'max_members', 5));
+    const sizePreset = minMembers === maxMembers && (minMembers === 1 || minMembers === 2) ? String(minMembers) : 'custom';
+    const dissolveMinutes = rule(draft, 'auto_dissolve_minutes', null);
+    const guestList = (rule(draft, 'guest_list', []) as string[]).filter(Boolean);
+
+    const setGroupPreset = (preset: string) => {
+        if (preset === '1' || preset === '2') {
+            setDraft((current) => ({ ...current, min_members: Number(preset), max_members: Number(preset) }));
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* ---- Rules ---- */}
@@ -96,26 +111,70 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                    <label className="flex flex-col gap-1.5">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Group size (min)</span>
-                        <input
-                            type="number"
-                            min={1}
-                            value={Number(rule(draft, 'min_members', 1))}
-                            onChange={(e) => set('min_members', Number(e.target.value))}
-                            className="rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface outline-none focus:border-secondary"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-1.5">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Group size (max)</span>
-                        <input
-                            type="number"
-                            min={1}
-                            value={Number(rule(draft, 'max_members', 5))}
-                            onChange={(e) => set('max_members', Number(e.target.value))}
-                            className="rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface outline-none focus:border-secondary"
-                        />
-                    </label>
+                    <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-surface-container-lowest p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Group size</span>
+                                <p className="mt-1 text-xs text-on-surface-variant">Choose a fixed team size or let the facilitator set a range.</p>
+                            </div>
+                            <span className="rounded-full bg-secondary/10 px-2.5 py-1 font-mono text-[11px] font-bold text-secondary">
+                                {sizePreset === 'custom' ? `${minMembers}–${maxMembers} people` : `${minMembers} ${minMembers === 1 ? 'person' : 'people'}`}
+                            </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Group size preset">
+                            {[
+                                ['1', '1 person', 'Solo groups'],
+                                ['2', '2 people', 'Pairs'],
+                                ['custom', 'Custom', 'Set a range'],
+                            ].map(([value, label, hint]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={sizePreset === value}
+                                    onClick={() => setGroupPreset(value)}
+                                    className={`rounded-xl border p-3 text-left transition-colors ${
+                                        sizePreset === value
+                                            ? 'border-secondary/60 bg-secondary/10 text-secondary'
+                                            : 'border-white/10 bg-surface-container-low hover:border-white/25 text-on-surface'
+                                    }`}
+                                >
+                                    <span className="block text-xs font-semibold">{label}</span>
+                                    <span className="mt-1 block text-[10px] text-on-surface-variant">{hint}</span>
+                                </button>
+                            ))}
+                        </div>
+                        {sizePreset === 'custom' && (
+                            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                                <label className="space-y-2">
+                                    <span className="flex items-center justify-between text-[11px] text-on-surface-variant">
+                                        <span>Minimum</span><strong className="font-mono text-secondary">{minMembers}</strong>
+                                    </span>
+                                    <input
+                                        type="range"
+                                        min={1}
+                                        max={Math.max(1, maxMembers)}
+                                        value={minMembers}
+                                        onChange={(e) => setDraft((current) => ({ ...current, min_members: Math.min(Number(e.target.value), maxMembers) }))}
+                                        className="w-full accent-secondary"
+                                    />
+                                </label>
+                                <label className="space-y-2">
+                                    <span className="flex items-center justify-between text-[11px] text-on-surface-variant">
+                                        <span>Maximum</span><strong className="font-mono text-secondary">{maxMembers}</strong>
+                                    </span>
+                                    <input
+                                        type="range"
+                                        min={Math.max(1, minMembers)}
+                                        max={50}
+                                        value={maxMembers}
+                                        onChange={(e) => setDraft((current) => ({ ...current, max_members: Math.max(Number(e.target.value), minMembers) }))}
+                                        className="w-full accent-secondary"
+                                    />
+                                </label>
+                            </div>
+                        )}
+                    </div>
 
                     <Select
                         label="Join mode"
@@ -138,26 +197,51 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                         ]}
                     />
 
-                    <label className="flex flex-col gap-1.5">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Auto-dissolve (minutes)</span>
-                        <input
-                            type="number"
-                            min={1}
-                            placeholder="off"
-                            value={rule(draft, 'auto_dissolve_minutes', null) === null ? '' : Number(rule(draft, 'auto_dissolve_minutes', 0))}
-                            onChange={(e) => set('auto_dissolve_minutes', e.target.value === '' ? null : Number(e.target.value))}
-                            className="rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface outline-none focus:border-secondary"
+                    <div className="rounded-2xl border border-white/10 bg-surface-container-lowest p-4">
+                        <Toggle
+                            on={dissolveMinutes !== null}
+                            onChange={(enabled) => set('auto_dissolve_minutes', enabled ? (Number(dissolveMinutes) || 10) : null)}
+                            label="Auto-dissolve"
+                            hint="Return everyone to the pool after a quiet interval."
                         />
-                    </label>
-                    <label className="flex flex-col gap-1.5">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Guest list (comma-separated)</span>
-                        <input
-                            type="text"
-                            value={(rule(draft, 'guest_list', []) as string[]).join(', ')}
-                            onChange={(e) => set('guest_list', e.target.value.split(',').map((n) => n.trim()).filter(Boolean))}
-                            className="rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface outline-none focus:border-secondary"
-                        />
-                    </label>
+                        {dissolveMinutes !== null && (
+                            <label className="mt-3 block space-y-2">
+                                <span className="flex items-center justify-between text-[11px] text-on-surface-variant">
+                                    <span>Timer</span><strong className="font-mono text-tertiary">{Number(dissolveMinutes)} min</strong>
+                                </span>
+                                <input
+                                    type="range"
+                                    min={1}
+                                    max={120}
+                                    step={1}
+                                    value={Number(dissolveMinutes)}
+                                    onChange={(e) => set('auto_dissolve_minutes', Number(e.target.value))}
+                                    className="w-full accent-tertiary"
+                                />
+                            </label>
+                        )}
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-surface-container-lowest p-4">
+                        <label className="flex flex-col gap-1.5">
+                            <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Guest list</span>
+                            <textarea
+                                rows={2}
+                                value={guestList.join(', ')}
+                                onChange={(e) => set('guest_list', e.target.value.split(/[,\n]/).map((n) => n.trim()).filter(Boolean))}
+                                placeholder="Names allowed to join, separated by commas"
+                                className="resize-y rounded-xl border border-white/10 bg-surface-container px-3 py-2.5 text-xs text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/45 focus:border-secondary"
+                            />
+                            <span className="text-[10px] leading-relaxed text-on-surface-variant/70">
+                                Empty means anyone with the PIN can enter.
+                            </span>
+                        </label>
+                        {guestList.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                {guestList.map((name) => <span key={name} className="rounded-full bg-secondary/10 px-2 py-1 font-mono text-[10px] text-secondary">{name}</span>)}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">

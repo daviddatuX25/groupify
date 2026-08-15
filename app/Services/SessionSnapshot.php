@@ -106,12 +106,13 @@ class SessionSnapshot
                     ->where('status', 'active')
                     ->get()
                     ->map(function (Membership $m) use ($anonymous, $admin): array {
-                        /** @var array{id: int, name: string, real_name: string|null, role: string} $member */
+                        /** @var array{id: int, name: string, real_name: string|null, role: string, custom_role: string|null} $member */
                         $member = [
                             'id' => $m->participant_id,
                             'name' => $m->participant->display_name ?? $m->participant->name,
                             'real_name' => $anonymous && $admin ? $m->participant->name : null,
                             'role' => $m->role,
+                            'custom_role' => $m->participant->custom_role,
                         ];
 
                         return $member;

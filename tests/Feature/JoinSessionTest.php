@@ -1,9 +1,11 @@
 <?php
 
+use App\Events\MembershipChanged;
 use App\Models\Participant;
 use App\Models\Session;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
@@ -41,6 +43,21 @@ it('joins with the correct PIN, name, and email', function () {
         ->and($participant->token)->toBe($this->token)
         ->and($participant->name)->toBe('Maya')
         ->and($participant->email)->toBe('maya@example.com');
+});
+
+it('broadcasts a participant join so admin monitors update in real time', function () {
+    Event::fake([MembershipChanged::class]);
+
+    $this->postJson(route('join.store', $this->session), [
+        'pin' => '4821',
+        'name' => 'Maya',
+        'device_token' => $this->token,
+    ])->assertRedirect();
+
+    Event::assertDispatched(
+        MembershipChanged::class,
+        fn (MembershipChanged $event): bool => $event->groupId === 0 && $event->action === 'participant_joined',
+    );
 });
 
 it('joins with email optional', function () {

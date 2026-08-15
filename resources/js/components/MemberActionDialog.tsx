@@ -1,0 +1,152 @@
+import { useEffect, useRef, useState } from 'react';
+
+type Action = 'move' | 'role' | 'ban';
+type GroupOption = { id: number; name: string };
+type MemberOption = { id: number; name: string; groupName: string };
+
+type Props = {
+    action: Action;
+    members: MemberOption[];
+    groups: GroupOption[];
+    roles: string[];
+    initialValue?: string;
+    onClose: () => void;
+    onConfirm: (value: string) => void;
+};
+
+const COPY: Record<Action, { title: string; description: string; confirm: string }> = {
+    move: {
+        title: 'Move participants',
+        description: 'Choose where the selected participants should go.',
+        confirm: 'Move participants',
+    },
+    role: {
+        title: 'Assign a custom role',
+        description: 'Custom grants add to each participant’s base permissions.',
+        confirm: 'Save role',
+    },
+    ban: {
+        title: 'Ban participants',
+        description: 'Banned participants are removed from their groups and cannot rejoin this session.',
+        confirm: 'Ban participants',
+    },
+};
+
+export default function MemberActionDialog({ action, members, groups, roles, initialValue, onClose, onConfirm }: Props) {
+    const [value, setValue] = useState(action === 'move' ? 'pool' : (initialValue ?? ''));
+    const closeRef = useRef<HTMLButtonElement>(null);
+    const copy = COPY[action];
+
+    useEffect(() => {
+        closeRef.current?.focus();
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [onClose]);
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#020618]/80 p-4 backdrop-blur-sm"
+            role="presentation"
+            onMouseDown={(event) => {
+                if (event.target === event.currentTarget) onClose();
+            }}
+        >
+            <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="member-action-title"
+                className="w-full max-w-lg rounded-2xl border border-white/15 bg-surface-container-low p-5 shadow-2xl"
+            >
+                <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+                    <div>
+                        <h2 id="member-action-title" className="font-display text-lg font-bold text-on-surface">
+                            {copy.title}
+                        </h2>
+                        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{copy.description}</p>
+                    </div>
+                    <button
+                        ref={closeRef}
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg px-2 py-1 text-on-surface-variant transition-colors hover:bg-surface-variant/50 hover:text-on-surface"
+                        aria-label="Close dialog"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-white/10 bg-surface-container-lowest p-3">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Selected</p>
+                    <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto text-xs text-on-surface">
+                        {members.map((member) => (
+                            <li key={member.id} className="flex items-center justify-between gap-3">
+                                <span className="truncate font-semibold">{member.name}</span>
+                                <span className="shrink-0 text-on-surface-variant">{member.groupName}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                {action === 'move' && (
+                    <label className="mt-4 block">
+                        <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Destination</span>
+                        <select
+                            autoFocus
+                            value={value}
+                            onChange={(event) => setValue(event.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary"
+                        >
+                            <option value="pool">Unassigned pool</option>
+                            {groups.map((group) => (
+                                <option key={group.id} value={String(group.id)}>
+                                    {group.name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                )}
+
+                {action === 'role' && (
+                    <label className="mt-4 block">
+                        <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Custom role</span>
+                        <select
+                            autoFocus
+                            value={value}
+                            onChange={(event) => setValue(event.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary"
+                        >
+                            <option value="">No custom role</option>
+                            {roles.map((role) => <option key={role} value={role}>{role}</option>)}
+                        </select>
+                    </label>
+                )}
+
+                {action === 'ban' && (
+                    <div className="mt-4 rounded-xl border border-error/30 bg-error-container/15 p-3 text-xs leading-relaxed text-error">
+                        This action affects {members.length === 1 ? 'this participant' : `all ${members.length} selected participants`} immediately.
+                    </div>
+                )}
+
+                <div className="mt-5 flex justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-variant/40 hover:text-on-surface"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onConfirm(value)}
+                        className={`rounded-xl px-4 py-2.5 text-xs font-bold transition-colors hover:brightness-110 ${action === 'ban' ? 'bg-error text-white' : 'bg-secondary text-on-secondary'}`}
+                    >
+                        {copy.confirm}
+                    </button>
+                </div>
+            </section>
+        </div>
+    );
+}

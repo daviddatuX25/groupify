@@ -1,4 +1,5 @@
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react';
+import { createRoot } from 'react-dom/client';
 import { configureGroupifyEcho } from '@/lib/echo';
 
 const initialAdminToken = (() => {
@@ -33,6 +34,25 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
+    resolve: async (name) => {
+        const pages = import.meta.glob<{ default: ResolvedComponent }>('./pages/**/*.tsx');
+        const page = pages[`./pages/${name}.tsx`];
+
+        if (!page) {
+            throw new Error(`Unknown Inertia page: ${name}`);
+        }
+
+        return page().then((module) => module.default);
+    },
+    setup({ el, App, props }) {
+        if (el) {
+            createRoot(el).render(<App {...props} />);
+
+            return;
+        }
+
+        return <App {...props} />;
+    },
     progress: {
         color: '#4B5563',
     },

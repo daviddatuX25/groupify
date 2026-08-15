@@ -17,6 +17,27 @@ beforeEach(function () {
     $this->session = Session::factory()->create();
     $this->headers = ['X-Admin-Token' => $this->session->admin_token, 'Accept' => 'application/json'];
 });
+it('lets the admin create an empty group with configured capacity', function () {
+    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), [
+        'rules' => ['min_members' => 2, 'max_members' => 8],
+    ])]);
+
+    $this->postJson(route('admin.groups.store', $this->session), [
+        'name' => 'Facilitator Group',
+        'capacity' => 4,
+    ], $this->headers)->assertOk();
+
+    $group = Group::query()->sole();
+    expect($group->name)->toBe('Facilitator Group')
+        ->and($group->capacity)->toBe(4)
+        ->and($group->leader_id)->toBeNull()
+        ->and(Membership::query()->count())->toBe(0);
+});
+
+it('requires the admin token to create a group', function () {
+    $this->postJson(route('admin.groups.store', $this->session), ['name' => 'Nope'])
+        ->assertNotFound();
+});
 
 it('serves the board to the admin with is_admin and stats', function () {
     Participant::factory()->count(3)->create(['group_session_id' => $this->session->id]);

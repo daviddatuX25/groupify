@@ -70,6 +70,8 @@ Route::post('/admin/sessions/{session}/groups/{group}/leader', [AdminActionsCont
     ->name('admin.groups.leader');
 Route::post('/admin/sessions/{session}/participants', [AdminActionsController::class, 'createParticipants'])
     ->name('admin.participants.store');
+Route::post('/admin/sessions/{session}/groups', [AdminActionsController::class, 'createGroup'])
+    ->name('admin.groups.store');
 Route::post('/admin/sessions/{session}/members/{participant}/ban', [AdminActionsController::class, 'ban'])
     ->name('admin.members.ban');
 Route::post('/admin/sessions/{session}/members/{participant}/role', [AdminActionsController::class, 'assignRole'])
@@ -84,6 +86,8 @@ Route::get('/admin/sessions/{session}/export', [AdminExportController::class, 'c
     ->name('admin.export');
 Route::get('/admin/sessions/{session}/activity', [AdminActivityController::class, 'index'])
     ->name('admin.activity');
+Route::get('/admin/sessions/{session}/messages', [AdminMessageController::class, 'index'])
+    ->name('admin.messages.index');
 Route::get('/admin/sessions/{session}/messages/pending', [AdminMessageController::class, 'pending'])
     ->name('admin.messages.pending');
 Route::post('/admin/sessions/{session}/messages/{message}/decide', [AdminMessageController::class, 'decide'])

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Events\GroupCreated;
 use App\Events\MembershipChanged;
 use App\Models\Group;
 use App\Models\Membership;
@@ -9,6 +10,7 @@ use App\Models\Participant;
 use App\Models\Session;
 use App\Services\EventRecorder;
 use App\Services\GroupLeadershipService;
+use App\Support\GroupNamer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +23,30 @@ use Illuminate\Validation\ValidationException;
 class AdminActionsController
 {
     use AuthorizesAdminToken;
+
+    /** Create an empty group without consuming a participant seat. */
+    public function createGroup(Request $request, Session $session, EventRecorder $recorder): JsonResponse
+    {
+        $this->authorizeAdmin($session, $request);
+
+        $rules = $session->config->rules();
+        $data = $request->validate([
+            'name' => ['nullable', 'string', 'max:80'],
+            'capacity' => ['sometimes', 'integer', 'min:'.$rules['min_members'], 'max:'.$rules['max_members']],
+        ]);
+
+        $name = trim((string) ($data['name'] ?? '')) !== '' ? $data['name'] : GroupNamer::next($session);
+        $group = $session->groups()->create([
+            'name' => $name,
+            'capacity' => $data['capacity'] ?? null,
+            'field_values' => [],
+        ]);
+
+        broadcast(new GroupCreated($session, $group))->toOthers();
+        $recorder->record($session, 'group_created', ['group_id' => $group->id, 'name' => $group->name, 'by' => 'admin']);
+
+        return response()->json(['ok' => true, 'group_id' => $group->id, 'name' => $group->name]);
+    }
 
     /** Force-move a member to another group or back to the pool (kick). */
     public function move(Request $request, Session $session, Participant $participant, EventRecorder $recorder): JsonResponse

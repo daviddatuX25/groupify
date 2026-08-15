@@ -17,6 +17,31 @@ class AdminMessageController
 {
     use AuthorizesAdminToken;
 
+    /** All visible room and group messages for the admin's scoped monitor. */
+    public function index(Request $request, Session $session): JsonResponse
+    {
+        $this->authorizeAdmin($session, $request);
+
+        $messages = SessionMessage::query()
+            ->where('group_session_id', $session->id)
+            ->where('status', 'visible')
+            ->with('author')
+            ->orderByDesc('created_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (SessionMessage $m): array => [
+                'id' => $m->id,
+                'scope' => $m->scope,
+                'group_id' => $m->group_id,
+                'author' => $m->author !== null ? ($m->author->display_name ?? $m->author->name) : 'Facilitator',
+                'body' => $m->body,
+                'at' => Carbon::parse($m->created_at)->toIso8601String(),
+            ])
+            ->values();
+
+        return response()->json(['messages' => $messages]);
+    }
+
     public function pending(Request $request, Session $session): JsonResponse
     {
         $this->authorizeAdmin($session, $request);
