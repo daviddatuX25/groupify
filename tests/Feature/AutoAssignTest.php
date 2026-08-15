@@ -14,7 +14,7 @@ beforeEach(function () {
     $this->withoutMiddleware(PreventRequestForgery::class);
 
     $this->session = Session::factory()->create();
-    $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), ['extensions' => ['match_me']])]);
+    $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), ['plugins' => ['match_me']])]);
 });
 
 it('auto-distributes all pooled participants into groups with space', function () {

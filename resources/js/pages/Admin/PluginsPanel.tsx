@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-const CATALOG: { key: string; category: string; icon: string; name: string; blurb: string }[] = [
+const FIRST_PARTY: { key: string; category: string; icon: string; name: string; blurb: string }[] = [
     {
         key: 'quiz',
         category: 'Event',
@@ -38,57 +38,66 @@ const CATALOG: { key: string; category: string; icon: string; name: string; blur
     },
 ];
 
+const AUTHORED_TEASERS = [
+    { icon: 'casino', name: 'Spin the Wheel', blurb: 'Randomize with a group-sized wheel' },
+    { icon: 'poll', name: 'Live Polls', blurb: 'Instant voting + results on the board' },
+    { icon: 'person_search', name: 'Name Picker', blurb: 'Pick volunteers from the pool' },
+    { icon: 'timer', name: 'Timed Rounds', blurb: 'Per-round countdowns and rotations' },
+];
+
 type Props = {
-    extensions: string[];
+    plugins: string[];
     onToggle: (key: string, enabled: boolean) => void;
     children?: ReactNode;
 };
 
 /**
- * Extensions shelf (flexibility-model.md §3, FR-7.3): first-party,
- * session-toggled modules. Enabled modules' panels render below the shelf.
+ * Plugins tab — ONE term, two origins (flexibility-model.md §3):
+ *   first_party  in-built, session-toggled modules (shelf + enabled panels)
+ *   authored     admin-created / installed plugins (future SDK slot)
  */
-export default function ExtensionsShelf({ extensions, onToggle, children }: Props) {
+export default function PluginsPanel({ plugins, onToggle, children }: Props) {
     return (
         <div className="space-y-6">
+            {/* ---- First-party shelf ---- */}
             <section className="glass-card rounded-2xl p-5 shadow-xl">
                 <div className="border-b border-white/10 pb-3">
-                    <h3 className="font-display text-base font-bold text-on-surface">Extensions</h3>
+                    <h3 className="font-display text-base font-bold text-on-surface">First-party Plugins</h3>
                     <p className="mt-0.5 text-xs text-on-surface-variant">
-                        Optional modules for this session only — enable what tonight needs; other sessions stay bare.
+                        In-built modules for this session only — enable what tonight needs; other sessions stay bare.
                     </p>
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {CATALOG.map((ext) => {
-                        const on = extensions.includes(ext.key);
+                    {FIRST_PARTY.map((p) => {
+                        const on = plugins.includes(p.key);
                         return (
                             <div
-                                key={ext.key}
+                                key={p.key}
                                 className={`flex flex-col justify-between gap-3 rounded-2xl border p-4 transition-all ${
                                     on ? 'border-primary/40 bg-primary/5' : 'border-white/10 bg-surface-container-lowest'
                                 }`}
                             >
                                 <div className="flex items-start gap-3">
                                     <span className={`material-symbols-outlined text-[22px] ${on ? 'text-primary' : 'text-on-surface-variant'}`}>
-                                        {ext.icon}
+                                        {p.icon}
                                     </span>
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <h4 className="font-display text-sm font-bold text-on-surface">{ext.name}</h4>
+                                            <h4 className="font-display text-sm font-bold text-on-surface">{p.name}</h4>
                                             <span className="rounded bg-surface-variant px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-on-surface-variant">
-                                                {ext.category}
+                                                {p.category}
                                             </span>
                                         </div>
-                                        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{ext.blurb}</p>
+                                        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{p.blurb}</p>
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     role="switch"
                                     aria-checked={on}
-                                    aria-label={`toggle ${ext.name}`}
-                                    onClick={() => onToggle(ext.key, !on)}
+                                    aria-label={`toggle ${p.name}`}
+                                    onClick={() => onToggle(p.key, !on)}
                                     className={`relative h-6 w-11 self-end rounded-full transition-colors ${
                                         on ? 'bg-primary-container' : 'bg-surface-variant'
                                     }`}
@@ -109,6 +118,33 @@ export default function ExtensionsShelf({ extensions, onToggle, children }: Prop
             </section>
 
             {children}
+
+            {/* ---- Authored (future) ---- */}
+            <section className="glass-card rounded-2xl border-dashed border-white/15 p-5 shadow-xl">
+                <div className="border-b border-white/10 pb-3">
+                    <h3 className="font-display text-base font-bold text-on-surface">Authored Plugins</h3>
+                    <p className="mt-0.5 text-xs text-on-surface-variant">
+                        Plugins you create or install — the future SDK slot. Same contract as first-party: hooks on
+                        session events, own screens, own data; permission grains come from the core matrix.
+                    </p>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {AUTHORED_TEASERS.map((t) => (
+                        <div
+                            key={t.name}
+                            className="flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-surface-container-lowest/60 p-5 text-center opacity-60"
+                        >
+                            <span className="material-symbols-outlined text-3xl text-on-surface-variant">{t.icon}</span>
+                            <h4 className="font-display text-sm font-bold text-on-surface">{t.name}</h4>
+                            <p className="text-xs leading-relaxed text-on-surface-variant">{t.blurb}</p>
+                            <span className="mt-1 rounded-full bg-surface-variant px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-on-surface-variant">
+                                Authored · Coming soon
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </section>
         </div>
     );
 }

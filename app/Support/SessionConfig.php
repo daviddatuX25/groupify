@@ -44,7 +44,7 @@ class SessionConfig implements Arrayable, JsonSerializable
             'fields' => [],
             'roles' => [],
             'perms' => [],
-            'extensions' => [],
+            'plugins' => [],
         ];
     }
 
@@ -75,7 +75,7 @@ class SessionConfig implements Arrayable, JsonSerializable
         return [
             'rules' => $rules,
             'fields' => $this->data['fields'] ?? [],
-            'extensions' => $this->data['extensions'] ?? [],
+            'plugins' => $this->data['plugins'] ?? [],
         ];
     }
 
@@ -158,9 +158,9 @@ class SessionConfig implements Arrayable, JsonSerializable
     }
 
     /** A session-toggled module (flexibility-model.md: Extensions). */
-    public function hasExtension(string $name): bool
+    public function hasPlugin(string $name): bool
     {
-        return in_array($name, $this->data['extensions'] ?? [], true);
+        return in_array($name, $this->data['plugins'] ?? [], true);
     }
 
     /** @return array<int, string> */

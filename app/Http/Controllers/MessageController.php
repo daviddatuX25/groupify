@@ -83,7 +83,7 @@ class MessageController
             }
             $status = $mode === 'moderated' ? 'pending' : 'visible';
         } elseif ($data['scope'] === 'announcement') {
-            abort_unless($session->config->hasExtension('announcements'), 404);
+            abort_unless($session->config->hasPlugin('announcements'), 404);
             $perms = app(PermissionService::class);
             $canAnnounce = $isAdmin && $perms->can('announce', 'admin', $session->config);
             if (! $canAnnounce && ! $isAdmin) {

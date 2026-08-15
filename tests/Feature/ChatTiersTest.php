@@ -16,7 +16,7 @@ beforeEach(function () {
     $this->withoutMiddleware(PreventRequestForgery::class);
 
     $this->session = Session::factory()->create();
-    $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), ['extensions' => ['announcements', 'moderation']])]);
+    $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), ['plugins' => ['announcements', 'moderation']])]);
     $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), [
         'rules' => ['chat_enabled' => true],
     ])]);

@@ -44,7 +44,7 @@ it('stores config as one validated JSON structure on the session row', function 
     $raw = $this->session->getRawOriginal('config');
 
     expect(is_string($raw))->toBeTrue()
-        ->and(json_decode($raw, true))->toHaveKeys(['rules', 'fields', 'perms', 'extensions']);
+        ->and(json_decode($raw, true))->toHaveKeys(['rules', 'fields', 'perms', 'plugins']);
 });
 
 it('resolves permissions against system defaults', function () {

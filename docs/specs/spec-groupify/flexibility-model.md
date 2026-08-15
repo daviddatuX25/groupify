@@ -57,22 +57,23 @@ Surfaces: group create/edit form · board card · board search · CSV export.
 | layer      | definition                                             |
 |------------|--------------------------------------------------------|
 | **Core**   | always-on grouping: session, join, pool, grid, groups, admin controls, fields, permissions |
-| **Extensions** | first-party, session-toggled modules, categorized: |
+| **Plugins** | session-toggled modules — ONE term, two origins: |
 |            | — Communication: chat tiers, announcements            |
 |            | — Formation: approval queue, proxy mode, auto-dissolve, match-me |
 |            | — Trust: device binding, moderation, ghost-group GC    |
 |            | — Data: retention policy, export                       |
 |            | — Event: group quiz, timers                           |
-| **Plugins**| future third-party modules, same slot contract        |
+|            | — `first_party`: in-built with Groupify            |
+|            | — `authored`: admin-created / installed (future SDK) |
 
 ### Extension contract
-An extension = hooks on session events + own screens + own data. It never
-mutates core grouping logic. Enabling is per-session (`extensions: []`), so one
-session can run with chat+quiz while another runs bare. Implemented keys
-(ExtensionRegistry, 2026-08-15): `quiz`, `match_me`, `proxy`, `announcements`,
-`moderation`. **Plugins are a distinct future layer**: third-party modules on
-the same slot contract; no plugin registry exists yet — the admin Plugins tab
-is a read-only shelf describing the seam.
+A plugin = hooks on session events + own screens + own data. It never mutates
+core grouping logic. Enabling is per-session (`plugins: []`), so one session can
+run with chat+quiz while another runs bare. Implemented first-party keys
+(PluginRegistry, 2026-08-15): `quiz`, `match_me`, `proxy`, `announcements`,
+`moderation` — all `origin: first_party`. Authored plugins (admin-created /
+installed) land in the same registry with `origin: authored` when the SDK
+ships; the contract is pinned in [plugin-sdk.md](plugin-sdk.md).
 
 ### Admin panel surface map (shipped, 2026-08-15)
 
@@ -81,8 +82,7 @@ is a read-only shelf describing the seam.
 | **Live Grid** (core) | QR join card, PIN, presence, Freeze/Dissolve/Export, auto-dissolve timer, guest list, stat tiles, live groups grid, pool bar (roles + ban + auto-distribute) | always |
 | **Configuration** (core) | Session Rules editor (group size, join mode, naming, anonymous, chat modes, freeze) + Group Fields editor (add/remove/attribute) | always |
 | **Permissions** (core) | action × role matrix (overrides system defaults) + custom session roles (define + assign) | always |
-| **Extensions** (session-toggled) | shelf of implemented modules; enabled modules' panels render here (quiz builder, proxy importer, announcements, moderation queue) | per-session toggle |
-| **Plugins** (future) | read-only coming-soon shelf (Spin the Wheel, Live Polls, …) | informational |
+| **Plugins** (one term) | first-party shelf with toggles; enabled modules' panels render here (quiz builder, proxy importer, announcements, moderation queue); authored section below (coming-soon SDK slot) | per-session toggle |
 | **Templates & Activity** (core) | config templates + event log | always |
 
 ### Session config object (one source of truth)
@@ -91,7 +91,7 @@ session {
   rules:      { min_members, max_members, join_mode, allow_user_creation, freeze }
   fields:     [ { name: "Chosen topic", type: text, required, filled_by, on_card, in_csv, filterable } ]
   perms:      { action → role → on/off }
-  extensions: [ ... ]
+  plugins:    [ ... ]
 }
 ```
 Every UI action → `can?(action, role)`; every card render → `fields`; extension

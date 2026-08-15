@@ -338,7 +338,7 @@ export default function Show({ session }: { session: SessionProps }) {
                             <div className="flex flex-wrap items-center gap-2.5">
                                 {canMutate && data.me.pooled && (
                                     <>
-                                        {(data.config.extensions ?? []).includes('match_me') && (
+                                        {(data.config.plugins ?? []).includes('match_me') && (
                                         <button
                                             type="button"
                                             onClick={() => mutate(`/s/${data.code}/match-me`)}

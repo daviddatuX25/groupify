@@ -1,9 +1,8 @@
 import { echo } from '@laravel/echo-react';
 import ComingNext from '@/components/ComingNext';
 import ConfigEditor from './ConfigEditor';
-import ExtensionsShelf from './ExtensionsShelf';
+import PluginsPanel from './PluginsPanel';
 import PermsEditor from './PermsEditor';
-import PluginsShelf from './PluginsShelf';
 import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
 import { useEffect, useState } from 'react';
@@ -59,7 +58,7 @@ export default function Show({
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
     const [liveCount, setLiveCount] = useState<number | null>(null);
     const [joinBase, setJoinBase] = useState('');
-    const [tab, setTab] = useState<'grid' | 'config' | 'perms' | 'extensions' | 'plugins' | 'templates'>('grid');
+    const [tab, setTab] = useState<'grid' | 'config' | 'perms' | 'plugins' | 'templates'>('grid');
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
     if (typeof window !== 'undefined' && session.admin_token) {
@@ -211,8 +210,8 @@ export default function Show({
     };
 
     const toggleExtension = (key: string, enabled: boolean) => {
-        const current = ((data.config.extensions as string[] | undefined) ?? []).filter((e) => e !== key);
-        act(`/admin/sessions/${session.id}/config`, { extensions: enabled ? [...current, key] : current });
+        const current = ((data.config.plugins as string[] | undefined) ?? []).filter((e) => e !== key);
+        act(`/admin/sessions/${session.id}/config`, { plugins: enabled ? [...current, key] : current });
     };
 
     // 3-7: projection hotkeys — i toggles join info, h hides the board (Mentimeter pattern)
@@ -257,7 +256,6 @@ export default function Show({
                                 ['grid', 'grid_view', 'Live Grid'],
                                 ['config', 'tune', 'Configuration'],
                                 ['perms', 'admin_panel_settings', 'Permissions'],
-                                ['extensions', 'extension', 'Extensions'],
                                 ['plugins', 'widgets', 'Plugins'],
                                 ['templates', 'history', 'Templates & Activity'],
                             ] as const
@@ -339,7 +337,6 @@ export default function Show({
                                 ['grid', 'Live Grid'],
                                 ['config', 'Config'],
                                 ['perms', 'Perms'],
-                                ['extensions', 'Extensions'],
                                 ['plugins', 'Plugins'],
                                 ['templates', 'History'],
                             ] as const
@@ -730,13 +727,13 @@ export default function Show({
                     )}
 
                     {/* ==== Extensions tab ==== */}
-                    {tab === 'extensions' && (
-                        <ExtensionsShelf
-                            extensions={(data.config.extensions ?? []) as string[]}
+                    {tab === 'plugins' && (
+                        <PluginsPanel
+                            plugins={(data.config.plugins ?? []) as string[]}
                             onToggle={toggleExtension}
                         >
                             {/* Announcements Module */}
-                            {(data.config.extensions ?? []).includes('announcements') && (
+                            {(data.config.plugins ?? []).includes('announcements') && (
                                 <section className="glass-card mt-6 rounded-2xl p-5">
                                     <p className="font-mono text-xs font-bold uppercase tracking-widest text-secondary">
                                         Broadcast Announcement
@@ -772,7 +769,7 @@ export default function Show({
                             )}
 
                             {/* Quiz Builder Module */}
-                            {(data.config.extensions ?? []).includes('quiz') && (
+                            {(data.config.plugins ?? []).includes('quiz') && (
                             <section className="glass-card mt-8 rounded-2xl p-5">
                                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
                                     <div>
@@ -898,7 +895,7 @@ export default function Show({
                             )}
 
                             {/* Proxy Importer Module */}
-                            {(data.config.extensions ?? []).includes('proxy') && (
+                            {(data.config.plugins ?? []).includes('proxy') && (
                             <section className="glass-card mt-8 rounded-2xl p-5">
                                 <h3 className="font-display text-base font-bold text-on-surface">Proxy Seat Importer</h3>
                                 <p className="mt-0.5 text-xs text-on-surface-variant">
@@ -928,7 +925,7 @@ export default function Show({
                             )}
 
                             {/* Moderation Queue */}
-                            {(data.config.extensions ?? []).includes('moderation') && modQueue.length > 0 && (
+                            {(data.config.plugins ?? []).includes('moderation') && modQueue.length > 0 && (
                                 <section className="glass-card mt-8 rounded-2xl border-tertiary/30 p-5">
                                     <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-tertiary">
                                         Moderation Queue ({modQueue.length})
@@ -986,7 +983,7 @@ export default function Show({
                                     </div>
                                 </section>
                             )}
-                        </ExtensionsShelf>
+                        </PluginsPanel>
                     )}
 
                     {/* ==== Configuration tab ==== */}
@@ -1023,7 +1020,7 @@ export default function Show({
                     )}
 
                     {/* ==== Plugins tab ==== */}
-                    {tab === 'plugins' && <PluginsShelf />}
+                    
 
                     {/* ==== Templates & Activity tab ==== */}
                     {tab === 'templates' && (

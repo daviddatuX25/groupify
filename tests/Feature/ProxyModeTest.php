@@ -13,7 +13,7 @@ beforeEach(function () {
     $this->withoutMiddleware(PreventRequestForgery::class);
 
     $this->session = Session::factory()->create();
-    $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), ['extensions' => ['proxy']])]);
+    $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), ['plugins' => ['proxy']])]);
     $this->adminHeaders = ['X-Admin-Token' => $this->session->admin_token, 'Accept' => 'application/json'];
 });
 

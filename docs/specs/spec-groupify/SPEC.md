@@ -27,7 +27,7 @@ In-person groups still form by shouting, count-offs, spreadsheets, and whiteboar
 - **CAP-5 Admin control** — force-move member, dissolve all, freeze grouping, CSV export (group / members / emails / fields). Success: each control takes effect live and is recorded in an activity feed.
 - **CAP-6 Group fields** — admin-defined per-group metadata (text night-one; choice/number later), required/optional, shown on card, searchable, in CSV. Success: a field added in setup appears on group create, board cards, and export.
 - **CAP-7 Permission engine** — role × action matrix (admin / leader / member; co-host and custom roles later), session overrides, delegation with bounds. Success: every action resolves session override → role default → system default; delegating an action affects only that session.
-- **CAP-8 Extensions framework** — session-toggled modules (chat, approval queue, proxy, auto-dissolve, match-me, quiz, device binding) via hooks on session events + own screens/data; core grouping logic untouched. Success: enabling an extension on one session and not another requires zero core code changes.
+- **CAP-8 Plugins framework** — session-toggled modules (ONE term, two origins: first-party in-built / authored admin-created) via hooks on session events + own screens/data; core grouping logic untouched. Permission grains are core: plugin capabilities join the `perms` matrix and resolve through the same `PermissionService::can()`. Success: enabling a plugin on one session and not another requires zero core code changes.
 - **CAP-9 Server-status UX** — realtime connection state with explicit "server offline" banner; heartbeat fallback. Success: a dead server is shown to every client within ~5s; the app never appears silently broken.
 
 ## Deferred — contracted, preserved (phased in roadmap.md)
@@ -61,4 +61,4 @@ In-person groups still form by shouting, count-offs, spreadsheets, and whiteboar
 
 # Success signal
 
-Night-one: a facilitator creates a session; 20+ classmates join by QR/PIN on phones; groups form with a required "Chosen topic" field; facilitator exports CSV (group / name / topic) — end-to-end on groupify.dxtechph.online, live updates within ~1s, no crashes. Vision: enabling an extension (e.g. group quiz) on a session requires zero changes to core grouping code.
+Night-one: a facilitator creates a session; 20+ classmates join by QR/PIN on phones; groups form with a required "Chosen topic" field; facilitator exports CSV (group / name / topic) — end-to-end on groupify.dxtechph.online, live updates within ~1s, no crashes. Vision: enabling a plugin (e.g. group quiz) on a session requires zero changes to core grouping code.

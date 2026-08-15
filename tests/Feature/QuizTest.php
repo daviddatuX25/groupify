@@ -29,7 +29,7 @@ beforeEach(function () {
 
 function startQuiz($session, array $questions): void
 {
-    $session->update(['config' => array_replace_recursive($session->config->toArray(), ['extensions' => ['quiz'], 'quiz' => ['questions' => $questions]])]);
+    $session->update(['config' => array_replace_recursive($session->config->toArray(), ['plugins' => ['quiz'], 'quiz' => ['questions' => $questions]])]);
     QuizRun::query()->create([
         'group_session_id' => $session->id,
         'status' => 'live',
@@ -38,7 +38,7 @@ function startQuiz($session, array $questions): void
 }
 
 it('saves quiz questions into the session config', function () {
-    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), ['extensions' => ['quiz']])]);
+    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), ['plugins' => ['quiz']])]);
     $this->putJson(route('admin.quiz.save', $this->session), ['questions' => $this->questions], $this->adminHeaders)
         ->assertOk();
 
@@ -46,7 +46,7 @@ it('saves quiz questions into the session config', function () {
 });
 
 it('starts a live quiz run', function () {
-    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), ['extensions' => ['quiz'], 'quiz' => ['questions' => $this->questions]])]);
+    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), ['plugins' => ['quiz'], 'quiz' => ['questions' => $this->questions]])]);
 
     $this->postJson(route('admin.quiz.start', $this->session), [], $this->adminHeaders)->assertOk();
 
@@ -189,7 +189,7 @@ it('never ships the correct answer in the quiz.updated broadcast payload', funct
 });
 
 it('replaces the question set when saving a shorter quiz', function () {
-    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), ['extensions' => ['quiz']])]);
+    $this->session->update(['config' => array_replace_recursive($this->session->config->toArray(), ['plugins' => ['quiz']])]);
     $this->putJson(route('admin.quiz.save', $this->session), ['questions' => [$this->questions[0]]], $this->adminHeaders)->assertOk();
 
     expect($this->session->fresh()->config->quiz())->toHaveCount(1);

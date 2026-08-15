@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Events\SessionConfigUpdated;
-use App\Extensions\ExtensionRegistry;
 use App\Models\Session;
+use App\Plugins\PluginRegistry;
 use App\Support\SessionConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,15 +22,15 @@ class SessionConfigController
 
         $merged = SessionConfig::deepMerge(
             $session->config->toArray(),
-            $request->only(['rules', 'fields', 'perms', 'extensions', 'roles', 'quiz'])
+            $request->only(['rules', 'fields', 'perms', 'plugins', 'roles', 'quiz'])
         );
 
         $validated = Validator::make($merged, self::rules())->validate();
 
-        $registry = app(ExtensionRegistry::class);
-        foreach ($validated['extensions'] ?? [] as $extension) {
-            if (! in_array($extension, $registry->registered(), true)) {
-                throw ValidationException::withMessages(['extensions' => 'Unknown extension: '.$extension]);
+        $registry = app(PluginRegistry::class);
+        foreach ($validated['plugins'] ?? [] as $plugin) {
+            if (! array_key_exists($plugin, $registry->registered())) {
+                throw ValidationException::withMessages(['plugins' => 'Unknown plugin: '.$plugin]);
             }
         }
 
@@ -92,8 +92,8 @@ class SessionConfigController
             'quiz.questions.*.options.*' => ['required', 'string', 'max:80'],
             'quiz.questions.*.answer' => ['required', 'integer', 'min:0'],
             'quiz.questions.*.points' => ['required', 'integer', 'min:1', 'max:100'],
-            'extensions' => ['array'],
-            'extensions.*' => ['string', 'max:60'],
+            'plugins' => ['array'],
+            'plugins.*' => ['string', 'max:60'],
         ];
     }
 }

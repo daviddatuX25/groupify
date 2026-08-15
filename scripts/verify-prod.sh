@@ -52,7 +52,7 @@ echo "$BOARD" | "$PY" -c "import json,sys; d=json.load(sys.stdin); g=[x for x in
 
 step "quiz (enable extension, save, start, grade, leaderboard)"
 curl -s -b "$COOKIE" -H "X-XSRF-TOKEN: $XSRF" -H "X-Admin-Token: $ATOK" -H 'Accept: application/json' -H 'Content-Type: application/json' \
-    -X PUT "$BASE_URL/admin/sessions/$SID/config" -d '{"extensions":["quiz"]}' -o /dev/null
+    -X PUT "$BASE_URL/admin/sessions/$SID/config" -d '{"plugins":["quiz"]}' -o /dev/null
 Q='{"questions":[{"q":"1+1?","options":["2","3"],"answer":0,"points":10}]}'
 curl -s -b "$COOKIE" -H "X-XSRF-TOKEN: $XSRF" -H "X-Admin-Token: $ATOK" -H 'Accept: application/json' -H 'Content-Type: application/json' \
     -X PUT "$BASE_URL/admin/sessions/$SID/quiz" -d "$Q" -o /dev/null

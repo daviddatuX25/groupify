@@ -1,9 +1,9 @@
 <?php
 
-use App\Extensions\ExtensionRegistry;
 use App\Models\Group;
 use App\Models\Participant;
 use App\Models\Session;
+use App\Plugins\PluginRegistry;
 use App\Support\SessionConfig;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -67,32 +67,34 @@ it('enforces fill_group_fields delegation', function () {
         ->assertStatus(422)->assertJsonValidationErrors('field_values');
 });
 
-it('rejects extensions until a module ships', function () {
+it('accepts an empty plugin list and enables a first-party plugin', function () {
     $this->putJson(
         route('admin.sessions.config.update', $this->session),
-        ['extensions' => ['chat']],
-        ['X-Admin-Token' => $this->session->admin_token, 'Accept' => 'application/json']
-    )->assertStatus(422)->assertJsonValidationErrors('extensions');
-
-    $this->putJson(
-        route('admin.sessions.config.update', $this->session),
-        ['extensions' => []],
+        ['plugins' => []],
         ['X-Admin-Token' => $this->session->admin_token, 'Accept' => 'application/json']
     )->assertOk();
+
+    $this->putJson(
+        route('admin.sessions.config.update', $this->session),
+        ['plugins' => ['quiz']],
+        ['X-Admin-Token' => $this->session->admin_token, 'Accept' => 'application/json']
+    )->assertOk();
+
+    expect($this->session->fresh()->config->hasPlugin('quiz'))->toBeTrue();
 });
 
-it('exposes the registry of implemented session-toggled extensions', function () {
-    expect(app(ExtensionRegistry::class)->registered())->toBe([
-        'quiz',
-        'match_me',
-        'proxy',
-        'announcements',
-        'moderation',
+it('exposes the first-party plugin registry with origins', function () {
+    expect(app(PluginRegistry::class)->registered())->toBe([
+        'quiz' => PluginRegistry::ORIGIN_FIRST_PARTY,
+        'match_me' => PluginRegistry::ORIGIN_FIRST_PARTY,
+        'proxy' => PluginRegistry::ORIGIN_FIRST_PARTY,
+        'announcements' => PluginRegistry::ORIGIN_FIRST_PARTY,
+        'moderation' => PluginRegistry::ORIGIN_FIRST_PARTY,
     ]);
 });
 
 it('rejects enabling an unregistered extension key', function () {
     $this->putJson(route('admin.sessions.config.update', $this->session), [
-        'extensions' => ['definitely-not-a-module'],
+        'plugins' => ['definitely-not-a-module'],
     ], $this->adminHeaders)->assertStatus(422);
 });

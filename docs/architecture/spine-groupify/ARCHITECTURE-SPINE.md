@@ -89,15 +89,16 @@ keyed by field id; CSV export builds columns dynamically from config.
 Prevents: a migration per field, rigid export columns.
 Rule: adding a field is a config change only — no migration, no column.
 
-## AD-9 Extensions — hooks + own data, never core mutation [ADOPTED]
-Binds: extensions register listeners on session events, own screens, and own
+## AD-9 Plugins — hooks + own data, never core mutation [ADOPTED]
+Binds: plugins register listeners on session events, own screens, and own
 namespaced tables; core (session/join/pool/grid/groups/admin/fields/
 permissions) is extension-agnostic; taxonomy per flexibility-model.md
 (Core / Extensions / Plugins; domains Communication, Formation, Trust, Data,
 Event).
 Prevents: core/extension coupling, core logic forked per feature.
-Rule: enabling an extension on one session and not another is config-only;
-core code cannot know an extension exists.
+Rule: enabling a plugin on one session and not another is config-only;
+core code cannot know a plugin exists. One term, two origins
+(first-party / authored); permission grains are core — see plugin-sdk.md.
 
 ## AD-10 Operational envelope — one box, env-driven [ADOPTED]
 Binds: Docker dev; Dokploy deploy at groupify.dxtechph.online; SQLite file DB;

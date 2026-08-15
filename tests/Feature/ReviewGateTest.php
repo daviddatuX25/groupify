@@ -23,7 +23,7 @@ it('never ships quiz answers or private config to public board fetchers', functi
         ['q' => 'Secret?', 'options' => ['A', 'B'], 'answer' => 1, 'points' => 10],
     ];
     $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), [
-        'extensions' => ['quiz'],
+        'plugins' => ['quiz'],
         'quiz' => ['questions' => $questions],
         'perms' => ['announce' => ['member' => true]],
     ])]);
@@ -100,7 +100,7 @@ it('prefixes formula-like cells in the CSV export', function () {
 
 it('rejects out-of-range quiz answers and frozen sessions', function () {
     $this->session->update(['config' => SessionConfig::deepMerge($this->session->config->toArray(), [
-        'extensions' => ['quiz'],
+        'plugins' => ['quiz'],
         'quiz' => ['questions' => [
             ['q' => 'Pick one', 'options' => ['A', 'B'], 'answer' => 0, 'points' => 5],
         ]],

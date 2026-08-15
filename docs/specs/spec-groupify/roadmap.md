@@ -22,7 +22,7 @@ Phasing preserves the full vision (locked decision: cut scope, never the vision)
 - ~~Approval queue for join requests~~ — **SHIPPED (phase-2 story A, 2026-08-14)**; admin-side queue view still pending
 - Communication tiers: announcements (priority banner), global chat, group chat + announcements (Reverb-ready)
 - Moderation: ~~kick & ban / global ban~~ — **SHIPPED (phase-2 story K, 2026-08-14)**; ghost-group GC + ownership transfer deferred
-- Extensions shelf UI (toggle modules per session)
+- ~~Extensions shelf UI~~ — **SHIPPED (2026-08-15)**: Plugins tab (first-party toggles + authored coming-soon)
 - Activity/attendance report export (join-time, presence duration, group-hopping — from activity feed)
 - ~~Session config templates~~ — **SHIPPED (phase-2 story F, 2026-08-14)**
 

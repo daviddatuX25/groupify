@@ -25,7 +25,7 @@ test('participant page renders a live quiz without crashing', async ({ page }) =
 
     const admin = { 'X-Admin-Token': atok, 'X-XSRF-TOKEN': xsrf, 'Content-Type': 'application/json', Accept: 'application/json' };
     // The quiz is an optional extension (flexibility-model.md §3) — enable it first.
-    await request.put(`/admin/sessions/${sid}/config`, { headers: admin, data: { extensions: ['quiz'] } });
+    await request.put(`/admin/sessions/${sid}/config`, { headers: admin, data: { plugins: ['quiz'] } });
     await request.put(`/admin/sessions/${sid}/quiz`, {
         headers: admin,
         data: { questions: [{ q: 'Capital of France?', options: ['Paris', 'Lyon'], answer: 0, points: 10 }] },
