@@ -101,12 +101,12 @@ export default function Join({ session }: { session: { code: string; status: str
                             {session.code}
                         </h2>
                         <p className="mt-1 text-xs text-on-surface-variant">
-                            {session.pin_required ? 'Enter the 4-digit PIN your host is showing on screen.' : 'You arrived through the host’s QR code. No PIN is needed.'}
+                            {session.pin_required ? 'Enter the 4-digit PIN your host is showing on screen.' : 'No PIN is needed for this session.'}
                         </p>
                         {!session.pin_required && (
                             <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
-                                <span className="material-symbols-outlined text-[14px]">qr_code_2</span>
-                                QR access
+                                <span className="material-symbols-outlined text-[14px]">lock_open</span>
+                                PIN-free access
                             </span>
                         )}
                     </div>
@@ -122,8 +122,8 @@ export default function Join({ session }: { session: { code: string; status: str
                         {/* PIN Input */}
                         {session.pin_required && (
                             <div>
-                                <label className="sr-only" htmlFor="pin">
-                                    4-Digit PIN
+                                <label className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant" htmlFor="pin">
+                                    4-digit PIN
                                 </label>
                                 <input
                                     id="pin"
@@ -131,10 +131,9 @@ export default function Join({ session }: { session: { code: string; status: str
                                     inputMode="numeric"
                                     autoFocus
                                     maxLength={4}
-                                    placeholder="PIN"
                                     value={data.pin}
                                     onChange={(e) => setData('pin', e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                    className="w-full rounded-xl border border-white/10 bg-[#060e20] py-3.5 text-center font-mono text-3xl font-extrabold tracking-[0.5em] text-[#ec4899] placeholder:font-mono placeholder:text-sm placeholder:tracking-normal placeholder:text-on-surface-variant/30 focus:border-primary focus:shadow-[0_0_15px_rgba(78,222,61,0.25)] focus:outline-none transition-all"
+                                    className="w-full rounded-xl border border-white/10 bg-[#060e20] py-3.5 text-center font-mono text-3xl font-extrabold tracking-[0.5em] text-[#ec4899] focus:border-primary focus:shadow-[0_0_15px_rgba(78,222,61,0.25)] focus:outline-none transition-all"
                                 />
                                 {errors.pin && <p className="mt-1.5 font-mono text-xs text-error">{errors.pin}</p>}
                             </div>
@@ -143,31 +142,29 @@ export default function Join({ session }: { session: { code: string; status: str
                         {/* Name and Email */}
                         <div className="flex flex-col gap-3">
                             <div>
-                                <label className="sr-only" htmlFor="name">
-                                    Your Name
+                                <label className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant" htmlFor="name">
+                                    Your name
                                 </label>
                                 <input
                                     id="name"
                                     type="text"
-                                    placeholder="Your name"
                                     value={data.name}
                                     onChange={(e) => setData('name', e.target.value)}
-                                    className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
+                                    className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-3 text-sm text-on-surface focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
                                 />
                                 {errors.name && <p className="mt-1.5 font-mono text-xs text-error">{errors.name}</p>}
                             </div>
 
                             <div>
-                                <label className="sr-only" htmlFor="email">
-                                    Email (optional)
+                                <label className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant" htmlFor="email">
+                                    Email <span className="font-normal normal-case tracking-normal text-on-surface-variant/70">(optional)</span>
                                 </label>
                                 <input
                                     id="email"
                                     type="email"
-                                    placeholder="Email (optional)"
                                     value={data.email}
                                     onChange={(e) => setData('email', e.target.value)}
-                                    className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
+                                    className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-3 text-sm text-on-surface focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
                                 />
                                 {errors.email && <p className="mt-1.5 font-mono text-xs text-error">{errors.email}</p>}
                             </div>

@@ -49,8 +49,8 @@ export default function New() {
     });
 
     const summary = [
-        data.qr_pinless ? 'QR skips PIN' : 'QR requires PIN',
-        data.join_mode === 'open' ? 'open group joins' : 'approval group joins',
+        data.join_mode === 'open' ? 'open access · direct URL skips PIN' : data.qr_pinless ? 'approval access · QR skips PIN' : 'approval access · PIN required',
+        data.join_mode === 'open' ? 'groups open immediately' : 'groups require approval',
         data.ends_at ? 'scheduled end' : 'manual end',
         data.retention_days === null ? 'manual deletion' : `keep ${data.retention_days} days`,
     ].join(' · ');
@@ -84,20 +84,20 @@ export default function New() {
                             <Toggle
                                 on={data.qr_pinless}
                                 onChange={(value) => setData('qr_pinless', value)}
-                                label="QR skips PIN"
-                                hint="People scanning the projected QR can enter without typing the PIN."
+                                label="QR skips PIN in approval mode"
+                                hint="For approval sessions, people scanning the projected QR can enter without typing the PIN."
                             />
                             <label className="flex flex-col gap-1.5 rounded-xl border border-white/10 bg-surface-container-lowest px-4 py-3 text-left">
-                                <span className="text-sm font-semibold text-on-surface">Group join mode</span>
+                                <span className="text-sm font-semibold text-on-surface">Access and group mode</span>
                                 <select
                                     value={data.join_mode}
                                     onChange={(event) => setData('join_mode', event.target.value as SetupData['join_mode'])}
                                     className="rounded-lg border border-white/10 bg-surface-container px-3 py-2.5 text-xs text-on-surface outline-none focus:border-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
                                 >
-                                    <option value="open">Open — people join groups immediately</option>
-                                    <option value="approval">Approval — leaders review group requests</option>
+                                    <option value="open">Open — direct URLs skip PIN; groups open immediately</option>
+                                    <option value="approval">Approval — direct URLs use PIN; leaders review groups</option>
                                 </select>
-                                <span className="text-[11px] leading-relaxed text-on-surface-variant">This controls group requests, not access to the session itself.</span>
+                                <span className="text-[11px] leading-relaxed text-on-surface-variant">Open is the fastest room entry. Approval keeps the direct URL behind the PIN; QR bypass is controlled above.</span>
                             </label>
                         </div>
                     </section>

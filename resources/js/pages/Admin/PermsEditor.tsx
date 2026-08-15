@@ -189,21 +189,27 @@ onSaved();
                     </p>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2.5">
-                    <input
-                        type="text"
-                        placeholder="role name"
-                        value={roleName}
-                        onChange={(e) => setRoleName(e.target.value)}
-                        className="w-36 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
-                    />
-                    <input
-                        type="text"
-                        placeholder={`actions (comma): ${actions.slice(0, 3).join(', ')}…`}
-                        value={roleActions}
-                        onChange={(e) => setRoleActions(e.target.value)}
-                        className="w-72 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
-                    />
+                <div className="mt-4 flex flex-wrap items-end gap-2.5">
+                    <label className="flex flex-col gap-1">
+                        <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Role name</span>
+                        <input
+                            type="text"
+                            aria-label="Role name"
+                            value={roleName}
+                            onChange={(e) => setRoleName(e.target.value)}
+                            className="w-36 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Action grants</span>
+                        <input
+                            type="text"
+                            aria-label="Action grants"
+                            value={roleActions}
+                            onChange={(e) => setRoleActions(e.target.value)}
+                            className="w-72 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
+                        />
+                    </label>
                     <button
                         type="button"
                         onClick={defineRole}

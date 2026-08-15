@@ -1,6 +1,7 @@
 import { echo, useConnectionStatus } from '@laravel/echo-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ComingNext from '@/components/ComingNext';
+import GroupCreateDialog from '@/components/GroupCreateDialog';
 import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
 import { configureGroupifyEcho } from '@/lib/echo';
@@ -259,9 +260,15 @@ return true;
         && (data.config.rules.group_chat_mode !== 'leader' || detailGroup.leader_id === data.me?.id),
     );
     const globalChatMode = String(data.config.rules.global_chat_mode ?? 'open');
+    const closeCreate = () => {
+        setCreating(false);
+        setCreateName('');
+        setFieldValues({});
+    };
+
     const submitCreate = () => {
         mutate(`/s/${data.code}/groups`, { name: createName, field_values: fieldValues });
-        setCreating(false);
+        closeCreate();
     };
 
     return (
@@ -283,7 +290,7 @@ return true;
                                 ? `${window.location.origin}/join/${data.code}`
                                 : `/join/${data.code}`}
                         </span>{' '}
-                        and enter the PIN.
+                        {data.config.rules.join_mode === 'open' ? 'and join directly.' : 'and enter the PIN.'}
                     </span>
                 </div>
             </div>
@@ -408,52 +415,19 @@ return true;
                             </div>
                         </div>
 
-                        {/* Expandable Group Creation Form */}
                         {creating && canMutate && (
-                            <form
-                                className="mt-5 border-t border-white/10 pt-5"
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    submitCreate();
-                                }}
-                            >
-                                <p className="font-mono text-xs font-bold uppercase tracking-wider text-secondary">
-                                    Create a New Team
-                                </p>
-                                <div className="mt-3 flex flex-col gap-3">
-                                    <input
-                                        type="text"
-                                        placeholder="Group name (optional — auto-named)"
-                                        value={createName}
-                                        onChange={(e) => setCreateName(e.target.value)}
-                                        className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
-                                    />
-                                    {data.config.fields.map((f) => (
-                                        <input
-                                            key={f.name}
-                                            type="text"
-                                            placeholder={`${f.name}${f.required ? ' *' : ''}`}
-                                            value={fieldValues[f.name] ?? ''}
-                                            onChange={(e) => setFieldValues((v) => ({ ...v, [f.name]: e.target.value }))}
-                                            className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
-                                        />
-                                    ))}
-                                </div>
-                                <div className="mt-4 flex gap-2">
-                                    <button
-                                        className="rounded-xl bg-primary-container px-6 py-2 font-display text-xs font-bold text-on-primary-container shadow-[0_0_15px_rgba(78,222,61,0.25)] transition-all hover:brightness-110"
-                                    >
-                                        Create
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setCreating(false)}
-                                        className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
+                            <GroupCreateDialog
+                                title="Create a new team"
+                                description="Choose a name and add any session fields before you join."
+                                name={createName}
+                                onNameChange={setCreateName}
+                                fields={data.config.fields}
+                                fieldValues={fieldValues}
+                                onFieldChange={(name, value) => setFieldValues((values) => ({ ...values, [name]: value }))}
+                                onClose={closeCreate}
+                                onSubmit={submitCreate}
+                                submitLabel="Create"
+                            />
                         )}
                     </section>
                 )}
@@ -555,11 +529,11 @@ return true;
                             search
                         </span>
                         <input
-                            type="text"
-                            placeholder="Find a team or topic…"
+                            type="search"
+                            aria-label="Search teams and topics"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-surface-container-high/80 py-2.5 pl-10 pr-4 font-sans text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
+                            className="w-full rounded-xl border border-white/10 bg-surface-container-high/80 py-2.5 pl-10 pr-4 font-sans text-sm text-on-surface focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
                         />
                     </div>
                     <label className="group flex shrink-0 cursor-pointer items-center gap-2 select-none">
@@ -837,11 +811,11 @@ return true;
                                 </div>
                                 {canPostToDetailGroup && (
                                     <div className="mt-3 flex gap-2">
-                                        <input type="text" value={groupDraft} placeholder={`Message ${detailGroup.name}…`} onChange={(event) => setGroupDraft(event.target.value)} onKeyDown={(event) => {
+                                        <input type="text" aria-label={`Message ${detailGroup.name}`} value={groupDraft} onChange={(event) => setGroupDraft(event.target.value)} onKeyDown={(event) => {
  if (event.key === 'Enter' && groupDraft.trim()) {
  const body = groupDraft.trim(); setGroupDraft(''); mutate(`/s/${data.code}/messages`, { scope: 'group', group_id: detailGroup.id, body }); 
 } 
-}} className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3 py-2.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:outline-none" />
+}} className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3 py-2.5 text-xs text-on-surface focus:border-primary focus:outline-none" />
                                         <button type="button" onClick={() => {
  const body = groupDraft.trim();
 
@@ -910,7 +884,7 @@ return;
                                     <div className="mt-4 flex gap-2">
                                         <input
                                             type="text"
-                                            placeholder={globalChatMode === 'moderated' ? 'Post to the room for review…' : 'Post to the room…'}
+                                            aria-label={globalChatMode === 'moderated' ? 'Post to the room for review' : 'Post to the room'}
                                             value={globalDraft}
                                             onChange={(e) => setGlobalDraft(e.target.value)}
                                             onKeyDown={(e) => {
@@ -920,7 +894,7 @@ return;
                                                     mutate(`/s/${data.code}/messages`, { scope: 'global', body });
                                                 }
                                             }}
-                                            className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3.5 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-secondary focus:outline-none transition-all"
+                                            className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3.5 py-2 text-xs text-on-surface focus:border-secondary focus:outline-none transition-all"
                                         />
                                         <button
                                             type="button"

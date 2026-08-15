@@ -177,13 +177,13 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                     </div>
 
                     <Select
-                        label="Join mode"
-                        hint="Open seats immediately. Approval lets a leader review requests."
+                        label="Access and group mode"
+                        hint="Open sessions accept direct links without a PIN and open groups immediately. Approval sessions keep direct links behind the PIN and review group requests."
                         value={String(rule(draft, 'join_mode', 'open'))}
                         onChange={(v) => set('join_mode', v)}
                         options={[
-                            ['open', 'Open — anyone can join groups'],
-                            ['approval', 'Approval — leaders screen requests'],
+                            ['open', 'Open — direct links skip PIN; groups open immediately'],
+                            ['approval', 'Approval — direct links use PIN; leaders review groups'],
                         ]}
                     />
                     <Select
@@ -229,11 +229,10 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                                 rows={2}
                                 value={guestList.join(', ')}
                                 onChange={(e) => set('guest_list', e.target.value.split(/[,\n]/).map((n) => n.trim()).filter(Boolean))}
-                                placeholder="Names allowed to join, separated by commas"
-                                className="resize-y rounded-xl border border-white/10 bg-surface-container px-3 py-2.5 text-xs text-on-surface outline-none transition-colors placeholder:text-on-surface-variant/45 focus:border-secondary"
+                                className="resize-y rounded-xl border border-white/10 bg-surface-container px-3 py-2.5 text-xs text-on-surface outline-none transition-colors focus:border-secondary"
                             />
                             <span className="text-[10px] leading-relaxed text-on-surface-variant/70">
-                                Empty means anyone with the PIN can enter.
+                                Empty means no name restriction; access still follows the selected mode.
                             </span>
                         </label>
                         {guestList.length > 0 && (
@@ -253,8 +252,8 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                     <Toggle
                         on={Boolean(rule(draft, 'qr_pinless', true))}
                         onChange={(v) => set('qr_pinless', v)}
-                        label="QR skips PIN"
-                        hint="Trusted scans can join without typing the session PIN."
+                        label="QR skips PIN in approval mode"
+                        hint="For approval sessions, trusted scans can join without typing the session PIN."
                     />
                     <Select
                         label="Result retention"
@@ -315,13 +314,16 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                     {fieldDrafts.map((f, i) => (
                         <div key={i} className="rounded-xl border border-white/10 bg-surface-container-lowest p-3.5">
                             <div className="flex flex-wrap items-center gap-2.5">
-                                <input
-                                    type="text"
-                                    value={f.name}
-                                    onChange={(e) => setFieldDrafts((d) => d.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
-                                    placeholder="Field name (e.g. Chosen topic)"
-                                    className="flex-1 rounded-lg border border-white/10 bg-surface-container px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
-                                />
+                                <label className="flex min-w-0 flex-1 items-center gap-2">
+                                    <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Field name</span>
+                                    <input
+                                        type="text"
+                                        aria-label={`Field ${i + 1} name`}
+                                        value={f.name}
+                                        onChange={(e) => setFieldDrafts((d) => d.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                                        className="min-w-0 flex-1 rounded-lg border border-white/10 bg-surface-container px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
+                                    />
+                                </label>
                                 <select
                                     value={f.filled_by ?? 'leader'}
                                     onChange={(e) => setFieldDrafts((d) => d.map((x, j) => (j === i ? { ...x, filled_by: e.target.value } : x)))}
@@ -367,14 +369,16 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                         </p>
                     )}
 
-                    <div className="flex items-center gap-2 pt-1">
-                        <input
-                            type="text"
-                            value={newField.name}
-                            onChange={(e) => setNewField((f) => ({ ...f, name: e.target.value }))}
-                            placeholder="New field name…"
-                            className="flex-1 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
-                        />
+                    <div className="flex items-end gap-2 pt-1">
+                        <label className="flex min-w-0 flex-1 flex-col gap-1">
+                            <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">New field name</span>
+                            <input
+                                type="text"
+                                value={newField.name}
+                                onChange={(e) => setNewField((f) => ({ ...f, name: e.target.value }))}
+                                className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
+                            />
+                        </label>
                         <button
                             type="button"
                             onClick={() => {

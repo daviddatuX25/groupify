@@ -18,8 +18,11 @@ test('group card opens a detail view with messaging', async ({ page }) => {
 
     const token = randomUUID();
     await page.goto(`/join/${code}`);
-    await page.getByPlaceholder('PIN').fill(pin);
-    await page.getByPlaceholder('Your name').fill('Maya');
+    const pinInput = page.getByLabel('4-digit PIN');
+    if (await pinInput.count()) {
+        await pinInput.fill(pin);
+    }
+    await page.getByLabel('Your name').fill('Maya');
     await page.getByRole('button', { name: /enter the room/i }).click();
     await page.waitForURL(/\/s\/\d{6}/);
     await page.waitForTimeout(1000);
@@ -32,7 +35,7 @@ test('group card opens a detail view with messaging', async ({ page }) => {
     await expect(page.getByRole('dialog', { name: /team alpha group details/i })).toBeVisible();
     await expect(page.getByRole('dialog').getByRole('heading', { name: 'Team Alpha', exact: true })).toBeVisible();
     await expect(page.getByText('Group chat', { exact: true })).toBeVisible();
-    await expect(page.getByPlaceholder(/message team alpha/i)).toBeVisible();
+    await expect(page.getByRole('dialog').getByLabel(/message team alpha/i)).toBeVisible();
     await page.getByRole('button', { name: /close group details/i }).first().click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
 });

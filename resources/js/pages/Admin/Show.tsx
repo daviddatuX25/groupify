@@ -2,6 +2,7 @@ import { echo } from '@laravel/echo-react';
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
 import MemberActionDialog from '@/components/MemberActionDialog';
+import GroupCreateDialog from '@/components/GroupCreateDialog';
 import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
 import { configureGroupifyEcho } from '@/lib/echo';
@@ -81,7 +82,7 @@ export default function Show({
     const [adminMessages, setAdminMessages] = useState<AdminMessage[]>([]);
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
     const [liveCount, setLiveCount] = useState<number | null>(null);
-    const [joinBase, setJoinBase] = useState('');
+    const [joinBase, setJoinBase] = useState(() => (typeof window !== 'undefined' ? window.location.origin : ''));
     const [createGroupOpen, setCreateGroupOpen] = useState(false);
     const [timerMin, setTimerMin] = useState('');
     const [guestListText, setGuestListText] = useState('');
@@ -523,23 +524,27 @@ return null;
                                     </p>
                                     <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wider text-primary">
                                         <span className="material-symbols-outlined text-[13px]">qr_code_2</span>
-                                        {data.config.rules.qr_pinless === false ? 'PIN required' : 'PIN bypass enabled'}
+                                        {data.config.rules.join_mode === 'open'
+                                            ? 'Open access · direct URL skips PIN'
+                                            : data.config.rules.qr_pinless === false
+                                              ? 'PIN required'
+                                              : 'QR bypass enabled'}
                                     </p>
                                 </div>
 
-                                <div className="w-full">
+                                <label className="w-full">
+                                    <span className="mb-1 block text-center font-mono text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Join URL base</span>
                                     <input
-                                        type="text"
+                                        type="url"
                                         value={joinBase}
                                         onChange={(e) => setJoinBase(e.target.value)}
-                                        placeholder={typeof window !== 'undefined' ? window.location.origin : ''}
                                         className="w-full rounded-lg border border-white/10 bg-surface-container-lowest px-2.5 py-1 text-center font-mono text-xs text-secondary outline-none transition-all focus:border-secondary focus:ring-1 focus:ring-secondary"
                                         title="Join URL for phones on LAN"
                                     />
-                                    <p className="mt-1 text-center font-mono text-[9px] text-on-surface-variant/60 leading-tight">
-                                        For phones: set computer's LAN IP (e.g. 192.168.1.20:8081)
-                                    </p>
-                                </div>
+                                    <span className="mt-1 block text-center font-mono text-[9px] leading-tight text-on-surface-variant/60">
+                                        Use this computer's LAN address when phones are on the same network.
+                                    </span>
+                                </label>
                             </div>
 
                             {/* Control Card with Stat Tiles */}
@@ -600,15 +605,18 @@ return null;
 
                                 {/* Controls Row (Timer & Guest list) */}
                                 <div className="flex flex-wrap items-center gap-2.5">
-                                    <div className="flex items-center gap-1.5">
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            placeholder="Auto-dissolve (min)"
-                                            value={timerMin}
-                                            onChange={(e) => setTimerMin(e.target.value)}
-                                            className="w-40 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:border-secondary transition-all"
-                                        />
+                                    <label className="flex items-end gap-1.5">
+                                        <span className="sr-only">Auto-dissolve minutes</span>
+                                        <span className="relative">
+                                            <span className="absolute -top-4 left-1 font-mono text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Auto-dissolve</span>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={timerMin}
+                                                onChange={(e) => setTimerMin(e.target.value)}
+                                                className="w-40 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none transition-all focus:border-secondary"
+                                            />
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -634,16 +642,18 @@ return null;
                                         >
                                             Set timer
                                         </button>
-                                    </div>
-
-                                    <div className="flex flex-1 items-center gap-1.5 min-w-[240px]">
-                                        <input
-                                            type="text"
-                                            placeholder="Guest list (comma-separated names)"
-                                            value={guestListText}
-                                            onChange={(e) => setGuestListText(e.target.value)}
-                                            className="flex-1 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:border-secondary transition-all"
-                                        />
+                                    </label>
+                                    <label className="flex min-w-[240px] flex-1 items-end gap-1.5">
+                                        <span className="sr-only">Guest list names</span>
+                                        <span className="relative flex-1">
+                                            <span className="absolute -top-4 left-1 font-mono text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Guest list</span>
+                                            <input
+                                                type="text"
+                                                value={guestListText}
+                                                onChange={(e) => setGuestListText(e.target.value)}
+                                                className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none transition-all focus:border-secondary"
+                                            />
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -672,7 +682,7 @@ return null;
                                         >
                                             Set guest list
                                         </button>
-                                    </div>
+                                    </label>
                                 </div>
 
                                 {/* 4-Column Stat Tiles */}
@@ -785,40 +795,29 @@ return null;
                                 )}
                             </div>
                             {createGroupOpen && (
-                                <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-secondary/25 bg-secondary/5 p-4 sm:flex-row sm:items-end">
-                                    <label className="flex-1">
-                                        <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Group name</span>
-                                        <input
-                                            value={createGroupName}
-                                            onChange={(e) => setCreateGroupName(e.target.value)}
-                                            placeholder="Optional — auto-name if blank"
-                                            className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 text-xs text-on-surface outline-none placeholder:text-on-surface-variant/45 focus:border-secondary"
-                                        />
-                                    </label>
-                                    <label className="sm:w-48">
-                                        <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Capacity</span>
-                                        <span className="relative block">
-                                            <select
-                                                value={createGroupCapacity}
-                                                onChange={(e) => setCreateGroupCapacity(e.target.value)}
-                                                className="w-full appearance-none rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2 pr-8 text-xs text-on-surface outline-none focus:border-secondary"
-                                            >
-                                                <option value="">Session default ({minGroupCapacity}–{maxGroupCapacity})</option>
-                                                {Array.from({ length: maxGroupCapacity - minGroupCapacity + 1 }, (_, i) => minGroupCapacity + i).map((size) => (
-                                                    <option key={size} value={size}>{size} {size === 1 ? 'person' : 'people'}</option>
-                                                ))}
-                                            </select>
-                                            <span className="material-symbols-outlined pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant">expand_more</span>
-                                        </span>
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={createAdminGroup}
-                                        className="rounded-xl bg-secondary px-4 py-2 font-display text-xs font-bold text-on-secondary hover:brightness-110"
-                                    >
-                                        Add empty group
-                                    </button>
-                                </div>
+                                <GroupCreateDialog
+                                    title="Add an empty group"
+                                    description="Create a team before participants arrive, then place people into it from the roster."
+                                    name={createGroupName}
+                                    onNameChange={setCreateGroupName}
+                                    capacity={createGroupCapacity}
+                                    onCapacityChange={setCreateGroupCapacity}
+                                    capacityOptions={[
+                                        { value: '', label: 'Session default', hint: `${minGroupCapacity}–${maxGroupCapacity} people` },
+                                        ...Array.from({ length: maxGroupCapacity - minGroupCapacity + 1 }, (_, i) => minGroupCapacity + i).map((size) => ({
+                                            value: String(size),
+                                            label: `${size} ${size === 1 ? 'person' : 'people'}`,
+                                            hint: 'Fixed group capacity',
+                                        })),
+                                    ]}
+                                    onClose={() => {
+                                        setCreateGroupOpen(false);
+                                        setCreateGroupName('');
+                                        setCreateGroupCapacity('');
+                                    }}
+                                    onSubmit={createAdminGroup}
+                                    submitLabel="Add empty group"
+                                />
                             )}
 
                             {groupView === 'cards' ? (
@@ -1153,7 +1152,7 @@ refetch();
                                     <div className="mt-3 flex gap-2">
                                         <input
                                             type="text"
-                                            placeholder="Announce to everyone in the room…"
+                                            aria-label="Announcement message"
                                             value={announceDraft}
                                             onChange={(e) => setAnnounceDraft(e.target.value)}
                                             onKeyDown={(e) => {
@@ -1223,7 +1222,7 @@ refetch();
                                                         onChange={(e) =>
                                                             setQuizDraft((d) => d.map((x, i) => (i === qi ? { ...x, q: e.target.value } : x)))
                                                         }
-                                                        placeholder={`Question ${qi + 1}`}
+                                                        aria-label={`Question ${qi + 1}`}
                                                         className="w-full rounded-xl border border-white/10 bg-surface-container px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
                                                     />
                                                     <input
@@ -1270,7 +1269,7 @@ refetch();
                                                                         ),
                                                                     )
                                                                 }
-                                                                placeholder={`Option ${oi + 1}`}
+                                                                aria-label={`Option ${oi + 1}`}
                                                                 className="w-full rounded-xl border border-white/10 bg-surface-container px-3 py-1.5 text-xs text-on-surface outline-none focus:border-secondary"
                                                             />
                                                         </div>
@@ -1318,13 +1317,16 @@ refetch();
                                     Pre-register absentees (e.g. field trips): one name per line. They claim their seat on join.
                                 </p>
                                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                <label className="flex flex-1 flex-col gap-1.5">
+                                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Names to pre-register</span>
                                     <textarea
+                                        aria-label="Names to pre-register"
                                         value={proxyNames}
                                         onChange={(e) => setProxyNames(e.target.value)}
                                         rows={3}
-                                        placeholder={'Ana\nBen\nCai'}
                                         className="w-full rounded-xl border border-white/10 bg-surface-container-lowest p-3 font-mono text-xs text-on-surface outline-none focus:border-secondary"
                                     />
+                                </label>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -1465,7 +1467,7 @@ refetch();
                                 </span>
                                 <input
                                     type="text"
-                                    placeholder="Template name"
+                                    aria-label="Template name"
                                     value={templateName}
                                     onChange={(e) => setTemplateName(e.target.value)}
                                     className="w-44 rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-1.5 text-xs text-on-surface outline-none focus:border-secondary"

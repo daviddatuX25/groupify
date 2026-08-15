@@ -20,12 +20,7 @@ class JoinController
     /** GET /join/{code} — participant entry (FR-2.1). PIN is never exposed here. */
     public function show(Request $request, Session $session): Response
     {
-        $qrToken = $request->query('qr_token');
-        $qrAuthorized = is_string($qrToken)
-            && is_string($session->qr_token)
-            && $qrToken !== ''
-            && hash_equals($session->qr_token, $qrToken);
-        $pinless = $qrAuthorized && (bool) ($session->config->rules()['qr_pinless'] ?? true);
+        $pinless = $this->pinlessAccess($session, $request->query('qr_token'));
 
         return Inertia::render('Session/Join', [
             'session' => [
@@ -34,6 +29,20 @@ class JoinController
                 'pin_required' => ! $pinless,
             ],
         ]);
+    }
+
+    private function pinlessAccess(Session $session, mixed $qrToken): bool
+    {
+        $rules = $session->config->rules();
+        if (($rules['join_mode'] ?? 'open') === 'open') {
+            return true;
+        }
+
+        return is_string($qrToken)
+            && is_string($session->qr_token)
+            && $qrToken !== ''
+            && hash_equals($session->qr_token, $qrToken)
+            && (bool) ($rules['qr_pinless'] ?? true);
     }
 
     /**
@@ -70,14 +79,9 @@ class JoinController
             'qr_token' => ['nullable', 'string', 'max:128'],
         ]);
 
-        $qrToken = $data['qr_token'] ?? '';
-        $pinlessQr = is_string($qrToken)
-            && is_string($session->qr_token)
-            && $qrToken !== ''
-            && hash_equals($session->qr_token, $qrToken)
-            && (bool) ($session->config->rules()['qr_pinless'] ?? true);
+        $pinless = $this->pinlessAccess($session, $data['qr_token'] ?? null);
 
-        if (! $pinlessQr && ($data['pin'] ?? '') === '') {
+        if (! $pinless && ($data['pin'] ?? '') === '') {
             throw ValidationException::withMessages(['pin' => 'Enter the 4-digit PIN shown by the host.']);
         }
 
@@ -87,7 +91,7 @@ class JoinController
         $limiter = app(RateLimiter::class);
         $key = 'join-pin:'.$session->id;
 
-        if (! $pinlessQr) {
+        if (! $pinless) {
             if (! hash_equals($session->pin, $data['pin'] ?? '')) {
                 $limiter->hit($key, 5 * 60);
                 if ($limiter->tooManyAttempts($key, 10)) {

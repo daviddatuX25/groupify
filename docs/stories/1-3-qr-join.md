@@ -23,15 +23,15 @@ so that participants scan and land on the join screen with the code pre-filled (
 - [x] QR rendering (AC: 1)
   - [x] `npm i qrcode` (+ `@types/qrcode` dev) — client-side QR, no server dependency
   - [x] `Admin/Show.tsx`: canvas QR from `${origin}/join/{code}` (dark modules on white), join URL caption shown
-- [x] Prefill + PIN (AC: 2, 3)
+- [x] Prefill + access mode (AC: 2, 3)
   - [x] Join URL carries the code in the path — `Session/Join` renders it (existing behavior, verified)
-  - [x] PIN still validated server-side (existing 1-2 flow; no change)
+  - [x] Open sessions accept direct URLs without a PIN; approval sessions use the PIN unless a valid pinless QR grant applies
 
 ## Dev Notes
 
-- FR-2.2: QR encodes join URL with code; PIN remains a typed secret — never embedded in the QR. [Source: docs/prds/prd-groupify/prd.md#FR-2.2]
+- FR-2.2: QR encodes the join URL with code; it never embeds the PIN. Open sessions also allow direct code URLs without a PIN, while approval sessions retain PIN protection unless QR PIN bypass is enabled. [Source: docs/prds/prd-groupify/prd.md#FR-2.2]
 - Client-side QR (qrcode npm) keeps the backend dependency-free; the canvas renders in SSR guard (`typeof window`).
-- No backend change → no new Pest tests; verification is browser-level (canvas pixel check + join page assertions).
+- The join controller applies the same access-mode rule to the page props and POST validation, so a direct URL cannot show a PIN form that the server rejects.
 
 ### Project Structure Notes
 

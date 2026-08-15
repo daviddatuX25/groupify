@@ -13,7 +13,12 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->withoutMiddleware(PreventRequestForgery::class);
 
-    $this->session = Session::factory()->create(['pin' => '4821']);
+    $this->session = Session::factory()->create([
+        'pin' => '4821',
+        'config' => array_replace_recursive(Session::factory()->raw()['config'], [
+            'rules' => ['join_mode' => 'approval'],
+        ]),
+    ]);
     $this->token = (string) Str::uuid();
 });
 

@@ -33,11 +33,14 @@ test('freeze blocks joins; unfreeze resumes', async ({ page, browser }) => {
     await participant.goto('/');
     await participant.evaluate(() => localStorage.clear());
     await participant.goto(`/join/${code}`);
-    await participant.getByPlaceholder('PIN').fill(pin);
-    await participant.getByPlaceholder('Your name').fill('Maya');
+    const pinInput = participant.getByLabel('4-digit PIN');
+    if (await pinInput.count()) {
+        await pinInput.fill(pin);
+    }
+    await participant.getByLabel('Your name').fill('Maya');
     await participant.getByRole('button', { name: /enter the room/i }).click();
     // Frozen sessions reject the join — the participant stays on the form
-    await expect(participant.getByPlaceholder('PIN')).toBeVisible({ timeout: 5000 });
+    await expect(participant.getByLabel('Your name')).toBeVisible({ timeout: 5000 });
     await participant.close();
 
     await page.getByRole('button', { name: 'Unfreeze', exact: true }).click();
@@ -51,8 +54,11 @@ test('dissolve all returns everyone to the pool', async ({ page, browser }) => {
     await a.goto('/');
     await a.evaluate(() => localStorage.clear());
     await a.goto(`/join/${code}`);
-    await a.getByPlaceholder('PIN').fill(pin);
-    await a.getByPlaceholder('Your name').fill('Maya');
+    const pinInput = a.getByLabel('4-digit PIN');
+    if (await pinInput.count()) {
+        await pinInput.fill(pin);
+    }
+    await a.getByLabel('Your name').fill('Maya');
     await a.getByRole('button', { name: /enter the room/i }).click();
     await a.waitForURL(/\/s\/\d{6}/);
     await a.getByRole('button', { name: /create new group/i }).click();

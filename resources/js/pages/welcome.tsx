@@ -57,7 +57,9 @@ export default function Welcome() {
                             <div className="h-[1px] flex-grow bg-white/20" />
                         </div>
 
-                        {/* Join Code Input Form */}
+                        <label htmlFor="join-code" className="self-start font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                            Session code
+                        </label>
                         <form
                             className="flex w-full items-center gap-2 rounded-2xl border border-white/15 bg-surface-container-low/90 p-2 shadow-xl backdrop-blur-xl transition-all focus-within:border-primary/50 focus-within:shadow-[0_0_20px_rgba(78,222,61,0.15)]"
                             onSubmit={(e) => {
@@ -69,14 +71,15 @@ export default function Welcome() {
                                 <span className="material-symbols-outlined text-xl">dialpad</span>
                             </div>
                             <input
+                                id="join-code"
                                 type="text"
                                 inputMode="numeric"
                                 autoComplete="one-time-code"
                                 maxLength={6}
-                                placeholder="6-DIGIT CODE"
+                                aria-label="6-digit session code"
                                 value={joinCode}
                                 onChange={(e) => setJoinCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                className="flex-grow border-none bg-transparent text-center font-mono text-xl font-bold tracking-[0.3em] text-primary placeholder:font-mono placeholder:text-sm placeholder:tracking-normal placeholder:text-on-surface-variant/40 focus:ring-0 focus:outline-none"
+                                className="flex-grow border-none bg-transparent text-center font-mono text-xl font-bold tracking-[0.3em] text-primary focus:ring-0 focus:outline-none"
                             />
                             <button
                                 type="submit"

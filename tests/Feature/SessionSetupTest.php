@@ -34,10 +34,43 @@ it('creates a session with pinless QR and configured lifecycle choices', functio
         ->and($session->ends_at?->format('Y-m-d H:i:s'))->toBe($endsAt);
 });
 
+it('allows an open session URL to join without a PIN', function () {
+    $session = Session::factory()->create();
+    $token = (string) Str::uuid();
+
+    $this->get(route('join.show', $session))
+        ->assertInertia(fn ($page) => $page
+            ->where('session.pin_required', false));
+
+    $this->postJson(route('join.store', $session), [
+        'name' => 'Direct Guest',
+        'device_token' => $token,
+    ])->assertRedirect();
+
+    expect(Participant::query()->where('token', $token)->exists())->toBeTrue();
+});
+
+it('keeps the PIN requirement for direct approval session URLs', function () {
+    $session = Session::factory()->create([
+        'config' => array_replace_recursive(Session::factory()->raw()['config'], [
+            'rules' => ['join_mode' => 'approval'],
+        ]),
+    ]);
+
+    $this->get(route('join.show', $session))
+        ->assertInertia(fn ($page) => $page
+            ->where('session.pin_required', true));
+
+    $this->postJson(route('join.store', $session), [
+        'name' => 'Direct Guest',
+        'device_token' => (string) Str::uuid(),
+    ])->assertStatus(422)->assertJsonValidationErrors('pin');
+});
+
 it('allows a valid pinless QR grant to join without the PIN', function () {
     $session = Session::factory()->create([
         'config' => array_replace_recursive(Session::factory()->raw()['config'], [
-            'rules' => ['qr_pinless' => true],
+            'rules' => ['join_mode' => 'approval', 'qr_pinless' => true],
         ]),
     ]);
     $token = (string) Str::uuid();
@@ -58,7 +91,7 @@ it('allows a valid pinless QR grant to join without the PIN', function () {
 it('rejects a missing or invalid PIN when QR PIN bypass is disabled', function () {
     $session = Session::factory()->create([
         'config' => array_replace_recursive(Session::factory()->raw()['config'], [
-            'rules' => ['qr_pinless' => false],
+            'rules' => ['join_mode' => 'approval', 'qr_pinless' => false],
         ]),
     ]);
 

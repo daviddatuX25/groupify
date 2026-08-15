@@ -28,8 +28,11 @@ test('live presence count reflects connected browsers', async ({ page, browser }
     const token = randomUUID();
     await second.addInitScript((t) => localStorage.setItem('groupify.device_token', t), token);
     await second.goto(`/join/${code}`);
-    await second.getByPlaceholder('PIN').fill(pin);
-    await second.getByPlaceholder('Your name').fill('Maya');
+    const pinInput = second.getByLabel('4-digit PIN');
+    if (await pinInput.count()) {
+        await pinInput.fill(pin);
+    }
+    await second.getByLabel('Your name').fill('Maya');
     await second.getByRole('button', { name: /enter the room/i }).click();
     await second.waitForURL(/\/s\/\d{6}/);
 

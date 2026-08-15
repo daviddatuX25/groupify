@@ -68,7 +68,7 @@ in a safe spot, reconnecting…" banner instead of a dead screen.
 ## F1 — Session management
 
 - **FR-1.1** Create a session; session gets a short code + admin token; creator becomes admin.
-- **FR-1.2** Configure session rules at creation and live: min/max members, join mode (open/approval), allow user group creation, naming scheme (Team Alpha… / Table 1…).
+- **FR-1.2** Configure session rules at creation and live: min/max members, access/group mode (open direct links skip PIN and groups open immediately; approval direct links use PIN and leaders review requests), allow user group creation, naming scheme (Team Alpha… / Table 1…).
 - **FR-1.3** Freeze/unfreeze grouping; frozen = no join/leave/swap, board read-only.
 - **FR-1.4** Archive/delete a session; archived sessions stop accepting joins; delete purges data (retention policy deferred, CAP-15).
 - **FR-1.5** Admin panel surfaces join info: QR (join URL incl. code) + PIN, always visible on the projector view.
@@ -77,8 +77,8 @@ in a safe spot, reconnecting…" banner instead of a dead screen.
 
 ## F2 — Join & identity
 
-- **FR-2.1** Join by code + PIN; wrong PIN → clear error, no lockout. [ASSUMPTION: PIN = 4 digits, admin-set, default random]
-- **FR-2.2** Join by scanning QR (join URL pre-fills code; PIN still required).
+- **FR-2.1** Join by direct code URL; open sessions require no PIN, while approval sessions require the 4-digit PIN unless the request carries a valid pinless QR grant. Wrong PIN → clear error, rate-limited brute-force guard.
+- **FR-2.2** Join by scanning QR (join URL pre-fills code; the PIN is never embedded; QR PIN bypass is configurable for approval sessions).
 - **FR-2.3** First join: display name (required) + email (optional, for CSV).
 - **FR-2.4** Per-device token (localStorage) → same device rejoins into its exact seat without re-entering identity.
 - **FR-2.5** One seat per device per session (token-based; fingerprinting is CAP-13, deferred).

@@ -18,8 +18,11 @@ async function join(page: Page, code: string, pin: string, name: string): Promis
     await page.goto('/'); // same-origin context for localStorage
     await page.evaluate(() => localStorage.clear());
     await page.goto(`/join/${code}`);
-    await page.getByPlaceholder('PIN').fill(pin);
-    await page.getByPlaceholder('Your name').fill(name);
+    const pinInput = page.getByLabel('4-digit PIN');
+    if (await pinInput.count() > 0) {
+        await pinInput.fill(pin);
+    }
+    await page.getByLabel('Your name').fill(name);
     await page.getByRole('button', { name: /enter the room/i }).click();
     await page.waitForURL(/\/s\/\d{6}/);
     await expect(page.getByText(/you.?re in the pool/)).toBeVisible();
