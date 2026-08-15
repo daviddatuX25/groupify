@@ -6,6 +6,7 @@ use App\Models\Session;
 use App\Models\SessionTemplate;
 use App\Support\SessionConfig;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,8 @@ class SessionController
             'join_mode' => ['sometimes', 'in:open,approval'],
             'qr_pinless' => ['sometimes', 'boolean'],
             'retention_days' => ['nullable', 'integer', 'in:1,2,30,180'],
-            'ends_at' => ['nullable', 'date', 'after:now'],
+            'end_mode' => ['sometimes', 'in:1h,12h,1d,1w,1m,manual,custom'],
+            'custom_ends_at' => ['required_if:end_mode,custom', 'nullable', 'date', 'after:now'],
         ]);
         $session = $this->createSession($request, $setup);
         $request->session()->put(
@@ -67,6 +69,7 @@ class SessionController
         if (array_key_exists('retention_days', $setup)) {
             $config['rules']['retention_days'] = $setup['retention_days'];
         }
+        $endsAt = $this->resolveEndsAt($setup);
 
         for ($attempt = 0; $attempt < 10; $attempt++) {
             $code = (string) random_int(100000, 999999);
@@ -82,7 +85,7 @@ class SessionController
                     'admin_token' => Str::random(40),
                     'qr_token' => Str::random(64),
                     'status' => 'live',
-                    'ends_at' => isset($setup['ends_at']) ? Carbon::parse($setup['ends_at']) : null,
+                    'ends_at' => $endsAt,
                     'config' => $config,
                 ]);
             } catch (UniqueConstraintViolationException) {
@@ -91,5 +94,22 @@ class SessionController
         }
 
         throw new RuntimeException('Could not allocate a unique session code.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $setup
+     */
+    private function resolveEndsAt(array $setup): ?CarbonInterface
+    {
+        return match ($setup['end_mode'] ?? '1d') {
+            '1h' => now()->addHour(),
+            '12h' => now()->addHours(12),
+            '1d' => now()->addDay(),
+            '1w' => now()->addWeek(),
+            '1m' => now()->addMonth(),
+            'custom' => Carbon::parse((string) $setup['custom_ends_at']),
+            'manual' => null,
+            default => now()->addDay(),
+        };
     }
 }

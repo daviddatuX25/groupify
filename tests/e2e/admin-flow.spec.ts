@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function createSession(page: Page): Promise<{ code: string; pin: string; adminUrl: string }> {
     await page.goto('/new');
-    await page.getByRole('button', { name: /create session/i }).click();
+    await page.getByRole('button', { name: /create room/i }).click();
     await page.waitForURL(/\/admin\/sessions\/\d+/);
     const adminUrl = page.url();
     const code = await page.locator('body').innerText().then((t) => t.match(/\d{6}/)?.[0] ?? '');

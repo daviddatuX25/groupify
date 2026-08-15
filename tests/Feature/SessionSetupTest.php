@@ -13,14 +13,14 @@ beforeEach(function () {
     $this->withoutMiddleware(PreventRequestForgery::class);
 });
 
-it('creates a session with pinless QR and configured lifecycle choices', function () {
-    $endsAt = now()->addHours(4)->format('Y-m-d H:i:s');
+it('creates a session with pinless QR and a preset lifecycle', function () {
+    $before = now();
 
     $this->post(route('sessions.store'), [
         'join_mode' => 'approval',
         'qr_pinless' => false,
         'retention_days' => 180,
-        'ends_at' => $endsAt,
+        'end_mode' => '12h',
     ])->assertRedirect();
 
     $session = Session::query()->sole();
@@ -31,7 +31,26 @@ it('creates a session with pinless QR and configured lifecycle choices', functio
             'qr_pinless' => false,
             'retention_days' => 180,
         ])
-        ->and($session->ends_at?->format('Y-m-d H:i:s'))->toBe($endsAt);
+        ->and($session->ends_at?->between($before->copy()->addHours(11)->addMinutes(59), now()->addHours(12)->addMinutes(1)))->toBeTrue();
+});
+
+it('supports manual and custom lifecycle choices', function () {
+    $this->post(route('sessions.store'), ['end_mode' => 'manual'])->assertRedirect();
+    expect(Session::query()->sole()->ends_at)->toBeNull();
+
+    $customEndsAt = now()->addDays(3)->startOfMinute();
+    $this->post(route('sessions.store'), [
+        'end_mode' => 'custom',
+        'custom_ends_at' => $customEndsAt->format('Y-m-d H:i'),
+    ])->assertRedirect();
+
+    expect(Session::query()->latest('id')->firstOrFail()->ends_at?->format('Y-m-d H:i'))->toBe($customEndsAt->format('Y-m-d H:i'));
+});
+
+it('requires a future custom end time', function () {
+    $this->from(route('sessions.new'))
+        ->post(route('sessions.store'), ['end_mode' => 'custom'])
+        ->assertSessionHasErrors('custom_ends_at');
 });
 
 it('allows an open session URL to join without a PIN', function () {

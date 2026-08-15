@@ -1,8 +1,10 @@
 import { router, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Logo } from '@/components/Logo';
-export default function Join({ session }: { session: { code: string; status: string; pin_required: boolean } }) {
+import { isSessionSaved, removeSavedSession, saveSession } from '@/lib/savedSessions';
+export default function Join({ session }: { session: { code: string; status: 'live' | 'frozen' | 'archived'; pin_required: boolean } }) {
     const [checking, setChecking] = useState(false);
+    const [saved, setSaved] = useState(false);
 
     const deviceToken = useMemo(() => {
         if (typeof window === 'undefined') return '';
@@ -45,6 +47,10 @@ export default function Join({ session }: { session: { code: string; status: str
             .catch(() => setChecking(false));
     }, [deviceToken, session.code]);
 
+    useEffect(() => {
+        setSaved(isSessionSaved(session.code));
+    }, [session.code]);
+
     const { data, setData, post, processing, errors } = useForm({
         pin: '',
         name: '',
@@ -60,13 +66,23 @@ export default function Join({ session }: { session: { code: string; status: str
                 <div className="glow-bl" />
                 <div className="relative z-10 flex flex-col items-center gap-3">
                     <span className="material-symbols-outlined animate-spin text-3xl text-primary">refresh</span>
-                    <p className="font-mono text-sm tracking-wide text-on-surface-variant">Checking your seat…</p>
+                    <p className="font-mono text-sm tracking-wide text-on-surface-variant">Checking your seat.</p>
                 </div>
             </main>
         );
     }
 
+    const toggleSaved = () => {
+        if (saved) {
+            removeSavedSession(session.code);
+        } else {
+            saveSession(session.code, session.status);
+        }
+        setSaved(!saved);
+    };
+
     const submit = () => {
+        if (saved) saveSession(session.code, session.status);
         window.localStorage.setItem('groupify.participant_name', data.name);
         post(`/join/${session.code}`);
     };
@@ -101,8 +117,19 @@ export default function Join({ session }: { session: { code: string; status: str
                             {session.code}
                         </h2>
                         <p className="mt-1 text-xs text-on-surface-variant">
-                            {session.pin_required ? 'Enter the 4-digit PIN your host is showing on screen.' : 'No PIN is needed for this session.'}
+                            {session.pin_required ? 'Enter the four-digit PIN shown by your host.' : 'This room is open. You can enter without a PIN.'}
                         </p>
+                        <button
+                            type="button"
+                            onClick={toggleSaved}
+                            aria-pressed={saved}
+                            className={`mt-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary ${
+                                saved ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/15 text-on-surface-variant hover:border-primary/40 hover:text-primary'
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">{saved ? 'bookmark' : 'bookmark_add'}</span>
+                            {saved ? 'Room saved on this browser' : 'Save this room'}
+                        </button>
                         {!session.pin_required && (
                             <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
                                 <span className="material-symbols-outlined text-[14px]">lock_open</span>

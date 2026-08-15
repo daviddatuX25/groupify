@@ -8,7 +8,7 @@ import { expect, test } from '@playwright/test';
  */
 test('renders the app shell from the service worker while offline', async ({ page, context }) => {
     await page.goto('/');
-    await expect(page.getByText('Groupify')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Groupify home' })).toBeVisible();
 
     const sw = await page.evaluate(async () => {
         if (!('serviceWorker' in navigator)) return { ok: false as const, reason: 'serviceWorker unavailable' };
@@ -29,6 +29,6 @@ test('renders the app shell from the service worker while offline', async ({ pag
     await page.reload();
 
     // The precached shell serves the landing without the network.
-    await expect(page.getByText('Groupify')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Start a session')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Groupify home' })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('link', { name: /start a new room/i })).toBeVisible();
 });

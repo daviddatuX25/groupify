@@ -182,8 +182,8 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                         value={String(rule(draft, 'join_mode', 'open'))}
                         onChange={(v) => set('join_mode', v)}
                         options={[
-                            ['open', 'Open — direct links skip PIN; groups open immediately'],
-                            ['approval', 'Approval — direct links use PIN; leaders review groups'],
+                            ['open', 'Open room. Anyone with the link can enter, and groups open immediately.'],
+                            ['approval', 'Review arrivals. Direct links ask for the PIN, and group requests wait for review.'],
                         ]}
                     />
                     <Select

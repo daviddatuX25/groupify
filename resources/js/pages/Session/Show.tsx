@@ -5,6 +5,7 @@ import GroupCreateDialog from '@/components/GroupCreateDialog';
 import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
 import { configureGroupifyEcho } from '@/lib/echo';
+import { isSessionSaved, removeSavedSession, saveSession } from '@/lib/savedSessions';
 
 type Member = { id: number; name: string; role: string; custom_role?: string | null };
 type Group = {
@@ -31,7 +32,7 @@ type QuizState = {
 };
 type SessionProps = {
     code: string;
-    status: string;
+    status: 'live' | 'frozen' | 'archived';
     dissolve_at?: string | null;
     presence: number;
     pool: { id: number; name: string }[];
@@ -63,10 +64,25 @@ export default function Show({ session }: { session: SessionProps }) {
     const [liveCount, setLiveCount] = useState<number | null>(null);
     const prevStatus = useRef<string | null>(null);
 
+    const [savedRoom, setSavedRoom] = useState(false);
+
     const deviceToken =
         typeof window === 'undefined' ? '' : (window.localStorage.getItem('groupify.device_token') ?? '');
 
     const data = board ?? session;
+
+    useEffect(() => {
+        setSavedRoom(isSessionSaved(session.code));
+    }, [session.code]);
+
+    const toggleSavedRoom = () => {
+        if (savedRoom) {
+            removeSavedSession(data.code);
+        } else {
+            saveSession(data.code, data.status);
+        }
+        setSavedRoom(!savedRoom);
+    };
 
     const refetchRef = useRef<() => void>(() => {});
     const seqRef = useRef(0);
@@ -341,13 +357,26 @@ return true;
                             </div>
                         )}
 
-                        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-surface-container-high/80 px-3.5 py-1.5 backdrop-blur-md">
-                            <span className="font-mono text-xs font-semibold uppercase tracking-widest text-on-surface-variant">
-                                Session
-                            </span>
-                            <span className="font-mono text-sm font-bold text-secondary">
-                                {data.code}
-                            </span>
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-surface-container-high/80 px-3.5 py-1.5 backdrop-blur-md">
+                                <span className="font-mono text-xs font-semibold uppercase tracking-widest text-on-surface-variant">
+                                    Room
+                                </span>
+                                <span className="font-mono text-sm font-bold text-secondary">
+                                    {data.code}
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={toggleSavedRoom}
+                                aria-pressed={savedRoom}
+                                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary ${
+                                    savedRoom ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 text-on-surface-variant hover:border-primary/40 hover:text-primary'
+                                }`}
+                            >
+                                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{savedRoom ? 'bookmark' : 'bookmark_add'}</span>
+                                {savedRoom ? 'Saved' : 'Save room'}
+                            </button>
                         </div>
                     </div>
                 </header>
