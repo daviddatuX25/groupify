@@ -9,7 +9,7 @@ use JsonSerializable;
  * The one validated session config structure (AD-4).
  *
  * Shape: { rules{min_members, max_members, join_mode, allow_user_creation,
- * naming, freeze}, fields[], perms{}, extensions[] }.
+ * naming, freeze}, fields[], perms{}, plugins[].
  * Adding a setting = extending defaults + validation schema — never a migration.
  *
  * @implements Arrayable<string, mixed>
@@ -37,14 +37,15 @@ class SessionConfig implements Arrayable, JsonSerializable
                 'auto_dissolve_minutes' => null,
                 'guest_list' => [],
                 'anonymous_mode' => false,
-                'chat_enabled' => false,
+                'chat_enabled' => true,
                 'group_chat_mode' => 'open', // open | leader
                 'global_chat_mode' => 'open', // open | muted | moderated
             ],
             'fields' => [],
             'roles' => [],
             'perms' => [],
-            'plugins' => [],
+            // Messaging announcements are available by default; other plugins are opt-in.
+            'plugins' => ['announcements'],
         ];
     }
 
@@ -157,22 +158,22 @@ class SessionConfig implements Arrayable, JsonSerializable
         return $this->data['quiz']['questions'] ?? [];
     }
 
-    /** A session-toggled module (flexibility-model.md: Extensions). */
+    /** @return array<int, string> */
+    public function plugins(): array
+    {
+        return $this->data['plugins'] ?? [];
+    }
+
+    /** A session-toggled module (plugin-sdk.md). */
     public function hasPlugin(string $name): bool
     {
-        return in_array($name, $this->data['plugins'] ?? [], true);
+        return in_array($name, $this->plugins(), true);
     }
 
     /** @return array<int, string> */
     public function guestList(): array
     {
         return $this->data['rules']['guest_list'] ?? [];
-    }
-
-    /** @return array<int, string> */
-    public function extensions(): array
-    {
-        return $this->data['extensions'] ?? [];
     }
 
     /**

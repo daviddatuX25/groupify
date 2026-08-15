@@ -18,10 +18,13 @@ type Props = {
 
 const rule = (r: Record<string, unknown>, k: string, fallback: unknown) => r[k] ?? fallback;
 
-function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+function Toggle({ on, onChange, label, hint }: { on: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
     return (
         <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface-container-lowest px-3.5 py-2.5">
-            <span className="text-xs font-medium text-on-surface">{label}</span>
+            <span>
+                <span className="block text-xs font-medium text-on-surface">{label}</span>
+                {hint && <span className="mt-0.5 block max-w-[34ch] text-[10px] leading-relaxed text-on-surface-variant/70">{hint}</span>}
+            </span>
             <button
                 type="button"
                 role="switch"
@@ -29,9 +32,7 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
                 onClick={() => onChange(!on)}
                 className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${on ? 'bg-primary-container' : 'bg-surface-variant'}`}
             >
-                <span
-                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${on ? 'left-4' : 'left-0.5'}`}
-                />
+                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${on ? 'left-4' : 'left-0.5'}`} />
             </button>
         </label>
     );
@@ -42,11 +43,13 @@ function Select({
     onChange,
     options,
     label,
+    hint,
 }: {
     value: string;
     onChange: (v: string) => void;
     options: [string, string][];
     label: string;
+    hint?: string;
 }) {
     return (
         <label className="flex flex-col gap-1.5">
@@ -56,12 +59,9 @@ function Select({
                 onChange={(e) => onChange(e.target.value)}
                 className="rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface outline-none focus:border-secondary"
             >
-                {options.map(([v, l]) => (
-                    <option key={v} value={v}>
-                        {l}
-                    </option>
-                ))}
+                {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
+            {hint && <span className="text-[10px] leading-relaxed text-on-surface-variant/70">ⓘ {hint}</span>}
         </label>
     );
 }
@@ -119,6 +119,7 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
 
                     <Select
                         label="Join mode"
+                        hint="Open seats immediately. Approval lets a leader review requests."
                         value={String(rule(draft, 'join_mode', 'open'))}
                         onChange={(v) => set('join_mode', v)}
                         options={[
@@ -128,6 +129,7 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                     />
                     <Select
                         label="Group naming"
+                        hint="Controls the default names used when teams are created."
                         value={String(rule(draft, 'naming', 'auto'))}
                         onChange={(v) => set('naming', v)}
                         options={[
@@ -159,15 +161,16 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    <Toggle on={Boolean(rule(draft, 'allow_user_creation', true))} onChange={(v) => set('allow_user_creation', v)} label="Participants can create groups" />
-                    <Toggle on={Boolean(rule(draft, 'anonymous_mode', false))} onChange={(v) => set('anonymous_mode', v)} label="Anonymous mode (alias identities)" />
-                    <Toggle on={Boolean(rule(draft, 'chat_enabled', false))} onChange={(v) => set('chat_enabled', v)} label="Chat enabled (room + group channels)" />
-                    <Toggle on={Boolean(rule(draft, 'freeze', false))} onChange={(v) => set('freeze', v)} label="Frozen (board read-only)" />
+                    <Toggle on={Boolean(rule(draft, 'allow_user_creation', true))} onChange={(v) => set('allow_user_creation', v)} label="Participants can create groups" hint="When off, only the host can create teams." />
+                    <Toggle on={Boolean(rule(draft, 'anonymous_mode', false))} onChange={(v) => set('anonymous_mode', v)} label="Anonymous mode (alias identities)" hint="Participants see aliases; the host retains real names." />
+                    <Toggle on={Boolean(rule(draft, 'chat_enabled', false))} onChange={(v) => set('chat_enabled', v)} label="Chat enabled (room + group channels)" hint="Shows the messaging dock and group chat to participants." />
+                    <Toggle on={Boolean(rule(draft, 'freeze', false))} onChange={(v) => set('freeze', v)} label="Frozen (board read-only)" hint="Stops joins, leaves, and moves while keeping the board visible." />
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                     <Select
                         label="Group chat mode"
+                        hint="Open lets all members write; leader keeps posting focused."
                         value={String(rule(draft, 'group_chat_mode', 'open'))}
                         onChange={(v) => set('group_chat_mode', v)}
                         options={[
@@ -177,6 +180,7 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                     />
                     <Select
                         label="Room chat mode"
+                        hint="Muted is read-only; moderated sends posts to the host queue."
                         value={String(rule(draft, 'global_chat_mode', 'open'))}
                         onChange={(v) => set('global_chat_mode', v)}
                         options={[

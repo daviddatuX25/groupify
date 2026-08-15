@@ -1,5 +1,9 @@
 # Groupify — UX Roadmap (2026-08-15)
 
+## Status
+
+P0-1, P0-2, and P0-3 are shipped in the current UX slice: group detail drawer with embedded group chat, discoverable messaging enabled by default for new sessions, and bite-size configuration hints. The remaining P1/P2 items stay on the shelf.
+
 > Post-v1.1.0 improvement plan from real usage feedback. Priorities:
 > **P0** = blocks comprehension/usage · **P1** = quality of life · **P2** = polish.
 

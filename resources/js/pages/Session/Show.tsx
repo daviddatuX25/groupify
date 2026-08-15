@@ -27,7 +27,7 @@ type SessionProps = {
     pool: { id: number; name: string }[];
     groups: Group[];
     me: Me;
-    config: { rules: Record<string, unknown>; fields: Field[]; extensions?: string[] };
+    config: { rules: Record<string, unknown>; fields: Field[]; plugins?: string[] };
 };
 
 const CHANNEL_EVENTS = ['SessionConfigUpdated', 'SessionStateUpdated', 'GroupCreated', 'SessionDeleted'];
@@ -42,10 +42,11 @@ export default function Show({ session }: { session: SessionProps }) {
     const [flash, setFlash] = useState<{ groupId: number; kind: 'joined' | 'left' } | null>(null);
     const [gone, setGone] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
-    const [messages, setMessages] = useState<{ id: number; scope: string; author: string; body: string; at: string }[]>([]);
+    const [messages, setMessages] = useState<{ id: number; scope: string; group_id?: number | null; author: string; body: string; at: string }[]>([]);
     const [chatOpen, setChatOpen] = useState(false);
     const [globalDraft, setGlobalDraft] = useState('');
     const [groupDraft, setGroupDraft] = useState('');
+    const [detailGroupId, setDetailGroupId] = useState<number | null>(null);
     const [quizPick, setQuizPick] = useState<number | null>(null);
     const [nowTick, setNowTick] = useState(Date.now());
     const [liveCount, setLiveCount] = useState<number | null>(null);
@@ -221,7 +222,7 @@ export default function Show({ session }: { session: SessionProps }) {
     const canMutate = data.status === 'live' && !(data.config.rules.freeze as boolean);
 
     const meIn = data.me ? data.groups.find((g) => g.members.some((m) => m.id === data.me?.id)) : undefined;
-
+    const detailGroup = detailGroupId === null ? null : data.groups.find((g) => g.id === detailGroupId) ?? null;
     const submitCreate = () => {
         mutate(`/s/${data.code}/groups`, { name: createName, field_values: fieldValues });
         setCreating(false);
@@ -689,8 +690,16 @@ export default function Show({ session }: { session: SessionProps }) {
                                     </ul>
                                 </div>
 
-                                {/* Card Footer: Slot Count & Join Action */}
-                                <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+                                {/* Card Footer: Slot Count, Detail, Join */}
+                                <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDetailGroupId(g.id)}
+                                        className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface-container/40 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-secondary transition-all hover:border-secondary/50 hover:bg-secondary/10"
+                                    >
+                                        <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+                                        Open team
+                                    </button>
                                     <p className="font-mono text-xs text-on-surface-variant">
                                         {full ? (
                                             <span className="font-bold text-[#ec4899]">FULL</span>
@@ -708,6 +717,7 @@ export default function Show({ session }: { session: SessionProps }) {
                                             {data.config.rules.join_mode === 'approval' ? 'Request to join' : 'Join'}
                                         </button>
                                     )}
+
                                     {full && (
                                         <button
                                             disabled
@@ -722,6 +732,75 @@ export default function Show({ session }: { session: SessionProps }) {
                         );
                     })}
                 </section>
+                {detailGroup && (
+                    <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${detailGroup.name} group details`}>
+                        <button type="button" aria-label="Close group details" onClick={() => setDetailGroupId(null)} className="absolute inset-0 cursor-default" />
+                        <aside className="relative z-10 flex h-full w-full max-w-lg flex-col overflow-y-auto border-l border-white/10 bg-[#0b1326] p-5 shadow-2xl sm:p-7">
+                            <header className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
+                                <div>
+                                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">Team detail</p>
+                                    <h2 className="mt-1 font-display text-2xl font-extrabold text-on-surface">{detailGroup.name}</h2>
+                                    <p className="mt-1 font-mono text-xs text-on-surface-variant">{detailGroup.member_count}/{detailGroup.capacity} members · {detailGroup.open_slots} open</p>
+                                </div>
+                                <button type="button" aria-label="Close group details" onClick={() => setDetailGroupId(null)} className="rounded-xl border border-white/10 p-2 text-on-surface-variant hover:text-on-surface">
+                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                </button>
+                            </header>
+
+                            <div className="mt-5 flex flex-wrap gap-2">
+                                {Object.entries(detailGroup.field_values).map(([key, value]) => (
+                                    <span key={key} className="rounded-lg border border-secondary/25 bg-secondary/10 px-3 py-1.5 font-mono text-xs text-secondary">{key}: <strong>{value || 'not set'}</strong></span>
+                                ))}
+                            </div>
+
+                            <section className="mt-6">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-on-surface-variant">Members</h3>
+                                    <span className="font-mono text-xs text-primary">{detailGroup.member_count}/{detailGroup.capacity}</span>
+                                </div>
+                                <ul className="mt-3 space-y-2">
+                                    {detailGroup.members.map((member) => (
+                                        <li key={member.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-surface-container-low p-3">
+                                            <span className="flex items-center gap-2 text-sm text-on-surface">
+                                                <span className={`h-2 w-2 rounded-full ${member.role === 'leader' ? 'bg-primary shadow-[0_0_7px_#6dfc57]' : 'bg-on-surface-variant/40'}`} />
+                                                {member.name}
+                                                {member.role === 'leader' && <span className="rounded bg-primary/15 px-2 py-0.5 font-mono text-[10px] text-primary">leader</span>}
+                                            </span>
+                                            {canMutate && data.me?.id === detailGroup.leader_id && member.role !== 'leader' && member.id !== data.me?.id && (
+                                                <button type="button" onClick={() => mutate(`/s/${data.code}/groups/${detailGroup.id}/members/${member.id}/kick`)} className="rounded-lg bg-error-container/30 px-2 py-1 font-mono text-[10px] text-error hover:bg-error-container/50">kick</button>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
+
+                            <section className="mt-6 flex flex-1 flex-col">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-on-surface-variant">Group chat</h3>
+                                    {!data.config.rules.chat_enabled && <span className="font-mono text-[10px] text-on-surface-variant/60">Host has disabled chat</span>}
+                                </div>
+                                <div className="mt-3 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-[#060e20] p-3">
+                                    {data.config.rules.chat_enabled ? messages.filter((message) => message.scope === 'group' && message.group_id === detailGroup.id).map((message) => (
+                                        <div key={message.id} className="rounded-lg bg-surface-container-low p-2.5 text-xs">
+                                            <div className="flex justify-between gap-2"><strong className="text-secondary">{message.author}</strong><span className="font-mono text-on-surface-variant/50">{new Date(message.at).toLocaleTimeString()}</span></div>
+                                            <p className="mt-1 text-on-surface">{message.body}</p>
+                                        </div>
+                                    )) : <p className="py-8 text-center text-xs text-on-surface-variant/60">Ask the host to enable messaging in Configuration.</p>}
+                                    {data.config.rules.chat_enabled && messages.filter((message) => message.scope === 'group' && message.group_id === detailGroup.id).length === 0 && <p className="py-8 text-center text-xs text-on-surface-variant/60">No group messages yet. Start the conversation.</p>}
+                                </div>
+                                {data.config.rules.chat_enabled && meIn && (
+                                    <div className="mt-3 flex gap-2">
+                                        <input type="text" value={groupDraft} placeholder={`Message ${detailGroup.name}…`} onChange={(event) => setGroupDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && groupDraft.trim()) { const body = groupDraft.trim(); setGroupDraft(''); mutate(`/s/${data.code}/messages`, { scope: 'group', group_id: detailGroup.id, body }); } }} className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3 py-2.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:outline-none" />
+                                        <button type="button" onClick={() => { const body = groupDraft.trim(); if (!body) return; setGroupDraft(''); mutate(`/s/${data.code}/messages`, { scope: 'group', group_id: detailGroup.id, body }); }} className="rounded-xl bg-primary-container px-3 text-on-primary-container hover:brightness-110" aria-label="Send group message"><span className="material-symbols-outlined text-[17px]">send</span></button>
+                                    </div>
+                                )}
+                            </section>
+                        </aside>
+                    </div>
+                )}
+
+                {/* Room messaging — enabled by default for new sessions */}
+
 
                 {/* Chat Drawer */}
                 {data.config.rules.chat_enabled && (

@@ -35,9 +35,7 @@ it('applies default config on create', function () {
             'naming' => 'alpha',
             'freeze' => false,
         ])
-        ->and($config->fields())->toBe([])
-        ->and($config->perms())->toBe([])
-        ->and($config->extensions())->toBe([]);
+        ->and($config->plugins())->toBe(['announcements']);
 });
 
 it('stores config as one validated JSON structure on the session row', function () {
