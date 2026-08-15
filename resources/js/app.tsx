@@ -24,8 +24,30 @@ const adminToken =
         ? ''
         : (window.localStorage.getItem('groupify.admin_token') ?? initialAdminToken);
 
+// Realtime transport: ALWAYS follow the page origin (localhost on the rig,
+// the computer's LAN IP for phones, the domain in production) — baking a fixed
+// host was the bug that broke phones (they dialed their own localhost). The
+// env override exists only for the dev stack (Vite on 5173 + WS on 8082).
+const envHost: string = import.meta.env.VITE_REVERB_HOST ?? '';
+const envPort: number = import.meta.env.VITE_REVERB_PORT ? Number(import.meta.env.VITE_REVERB_PORT) : 0;
+const wsHost =
+    typeof window !== 'undefined' && envHost === '' ? window.location.hostname : envHost;
+const wsPort =
+    envPort ||
+    (typeof window !== 'undefined'
+        ? Number(window.location.port || (window.location.protocol === 'https:' ? 443 : 80))
+        : 80);
+const forceTLS =
+    typeof window !== 'undefined'
+        ? window.location.protocol === 'https:'
+        : (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https';
+
 configureEcho({
     broadcaster: 'reverb',
+    wsHost,
+    wsPort,
+    wssPort: wsPort,
+    forceTLS,
     auth: {
         headers: {
             'X-Device-Token': deviceToken,

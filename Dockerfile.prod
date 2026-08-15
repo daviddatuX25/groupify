@@ -5,10 +5,11 @@ WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
-# Vite env is baked at build time — the WS endpoint the browser uses
-ARG VITE_REVERB_HOST=localhost
-ARG VITE_REVERB_PORT=8080
-ARG VITE_REVERB_SCHEME=http
+# Vite env is baked at build time. Host/port/scheme default EMPTY — the client
+# follows the page origin at runtime; the dev stack sets these explicitly.
+ARG VITE_REVERB_HOST=
+ARG VITE_REVERB_PORT=
+ARG VITE_REVERB_SCHEME=
 ARG VITE_REVERB_APP_KEY=groupify-app-key
 ENV VITE_REVERB_HOST=$VITE_REVERB_HOST VITE_REVERB_PORT=$VITE_REVERB_PORT VITE_REVERB_SCHEME=$VITE_REVERB_SCHEME VITE_REVERB_APP_KEY=$VITE_REVERB_APP_KEY
 RUN npm run build

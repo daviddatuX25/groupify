@@ -9,14 +9,9 @@ services:
       context: .
       dockerfile: Dockerfile.prod
       args:
-        # The Reverb app key is BAKED into the JS bundle — set a real random
-        # value for production and pass the same value as REVERB_APP_KEY below.
-        # NOTE: these use GROUPIFY_* variable names on purpose — the Laravel
-        # dev .env defines VITE_REVERB_* and would hijack plain ${VITE_...}
-        # substitution (that bug shipped ws://localhost:8080 into the bundle).
-        VITE_REVERB_HOST: ${GROUPIFY_REVERB_HOST:-localhost}
-        VITE_REVERB_PORT: ${GROUPIFY_REVERB_PORT:-8081}
-        VITE_REVERB_SCHEME: ${GROUPIFY_REVERB_SCHEME:-http}
+        # Only the app key is baked (WS auth). Host/port/scheme are NOT baked:
+        # the client derives the WS endpoint from the page origin at runtime,
+        # so phones on the LAN and the prod domain both work.
         VITE_REVERB_APP_KEY: ${GROUPIFY_REVERB_APP_KEY:-groupify-prod-key}
     ports:
       - "8081:80" # nginx (WS /app proxied inside; host port differs from dev)

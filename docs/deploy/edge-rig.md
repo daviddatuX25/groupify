@@ -3,11 +3,11 @@
 Validates the production network path — TLS termination + WebSocket upgrade
 through a real reverse proxy — without Dokploy.
 
-## Build the edge variant (bakes wss://localhost:9443)
+## Run the edge variant
 
 ```bash
-GROUPIFY_REVERB_PORT=9443 GROUPIFY_REVERB_SCHEME=https docker compose -f compose.prod.yaml build
-docker compose -f compose.prod.yaml up -d --force-recreate
+docker compose -f compose.prod.yaml build && docker compose -f compose.prod.yaml up -d --force-recreate
+docker compose -f compose.edge.yaml up -d
 docker compose -f compose.edge.yaml up -d          # Caddy: https://localhost:9443 -> app
 E2E_BASE_URL=https://localhost:9443 npx playwright test   # expect 9 passed + 2 skipped (sw-check + offline self-skip: SW requires trusted certs)
 ```

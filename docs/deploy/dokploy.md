@@ -37,11 +37,9 @@ the boot chain (entrypoint migrate/cache/APP_KEY + rootless drop).
 1. **Create application** — Docker (Git) type:
    - Repository: your Groupify git remote, branch `main`.
    - Build type: **Dockerfile** with path `Dockerfile.prod`.
-   - Build args (baked into the JS bundle — the browser's WS endpoint):
-     - `VITE_REVERB_HOST=groupify.dxtechph.online`
-     - `VITE_REVERB_APP_KEY=<your REVERB_APP_KEY>`
-     - `VITE_REVERB_PORT=443`
-     - `VITE_REVERB_SCHEME=https`
+   - Build args: `VITE_REVERB_APP_KEY=<your REVERB_APP_KEY>` (the ONLY baked
+     value — the WS endpoint follows the page origin at runtime, so phones on
+     your LAN and the public domain both get realtime automatically)
 2. **Domain & SSL** — set `groupify.dxtechph.online`; Dokploy issues the
    Let's Encrypt certificate (AC 1).
 3. **Environment variables** (see `.env.production.example`):
