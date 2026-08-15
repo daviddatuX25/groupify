@@ -4,13 +4,22 @@ import { expect, test, type Page } from '@playwright/test';
  * Admin god-mode flows: stats, freeze → join blocked, dissolve, CSV export.
  */
 
-async function createSession(page: Page): Promise<{ code: string; pin: string; adminUrl: string }> {
+async function createSession(
+    page: Page,
+): Promise<{ code: string; pin: string; adminUrl: string }> {
     await page.goto('/new');
+    await page.getByRole('button', { name: /go to finish step/i }).click();
     await page.getByRole('button', { name: /create room/i }).click();
     await page.waitForURL(/\/admin\/sessions\/\d+/);
     const adminUrl = page.url();
-    const code = await page.locator('body').innerText().then((t) => t.match(/\d{6}/)?.[0] ?? '');
-    const pin = await page.locator('body').innerText().then((t) => t.match(/PIN:\s*(\d{4})/)?.[1] ?? '');
+    const code = await page
+        .locator('body')
+        .innerText()
+        .then((t) => t.match(/\d{6}/)?.[0] ?? '');
+    const pin = await page
+        .locator('body')
+        .innerText()
+        .then((t) => t.match(/PIN:\s*(\d{4})/)?.[1] ?? '');
     return { code, pin, adminUrl };
 }
 
@@ -40,7 +49,9 @@ test('freeze blocks joins; unfreeze resumes', async ({ page, browser }) => {
     await participant.getByLabel('Your name').fill('Maya');
     await participant.getByRole('button', { name: /enter the room/i }).click();
     // Frozen sessions reject the join — the participant stays on the form
-    await expect(participant.getByLabel('Your name')).toBeVisible({ timeout: 5000 });
+    await expect(participant.getByLabel('Your name')).toBeVisible({
+        timeout: 5000,
+    });
     await participant.close();
 
     await page.getByRole('button', { name: 'Unfreeze', exact: true }).click();
@@ -69,5 +80,3 @@ test('dissolve all returns everyone to the pool', async ({ page, browser }) => {
     await expect(page.getByText(/unassigned pool \(1\)/i)).toBeVisible();
     await a.close();
 });
-
-
