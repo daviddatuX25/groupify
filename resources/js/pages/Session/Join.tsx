@@ -8,7 +8,15 @@ export default function Join({ session }: { session: { code: string; status: str
         if (typeof window === 'undefined') return '';
         let t = window.localStorage.getItem('groupify.device_token');
         if (!t) {
-            t = crypto.randomUUID();
+            // crypto.randomUUID requires a secure context (HTTPS); phones on a
+            // plain-HTTP LAN (the self-hosted setup) only get the fallback.
+            t =
+                typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                    ? crypto.randomUUID()
+                    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                          const r = (Math.random() * 16) | 0;
+                          return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+                      });
             window.localStorage.setItem('groupify.device_token', t);
         }
         return t;
