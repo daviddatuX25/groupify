@@ -86,9 +86,28 @@ export default function Show({ session }: { session: SessionProps }) {
         const channel = echo().channel(`session.${data.code}`);
         CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, () => refetchRef.current()));
 
+        const echoInst = echo() as unknown as {
+            connector?: {
+                options?: { auth?: { headers?: Record<string, string> } };
+                pusher?: { config?: { auth?: { headers?: Record<string, string> } } };
+            };
+        };
+        if (echoInst?.connector?.options?.auth) {
+            echoInst.connector.options.auth.headers = {
+                ...echoInst.connector.options.auth.headers,
+                'X-Device-Token': deviceToken,
+            };
+        }
+        if (echoInst?.connector?.pusher?.config?.auth) {
+            echoInst.connector.pusher.config.auth.headers = {
+                ...echoInst.connector.pusher.config.auth.headers,
+                'X-Device-Token': deviceToken,
+            };
+        }
+
         // FR-3.5: live presence — the presence channel's member count is the
         // real online population (vs the seat count in data.presence).
-        const presence = echo().join(`session.${data.code}`) // Echo prepends the presence- prefix itself;
+        const presence = echo().join(`session.${data.code}`);
         presence.here((members: unknown[]) => setLiveCount(members.length));
         presence.joining(() => setLiveCount((c) => (c === null ? c : c + 1)));
         presence.leaving((member: { name: string }) => {
@@ -177,14 +196,21 @@ export default function Show({ session }: { session: SessionProps }) {
             return g.name.toLowerCase().includes(q) || topic.includes(q);
         });
     }, [data.groups, query, openOnly]);
-
     if (gone) {
         return (
-            <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100">
-                <div className="text-center">
-                    <p className="text-3xl font-bold">This session has ended.</p>
-                    <a href="/" className="mt-4 inline-block text-cyan-400 underline">
-                        Back home
+            <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-surface px-6 text-on-surface">
+                <div className="glow-tr" />
+                <div className="glow-bl" />
+                <div className="glass-card relative z-10 max-w-md rounded-2xl p-8 text-center shadow-2xl backdrop-blur-xl">
+                    <span className="material-symbols-outlined text-5xl text-secondary">meeting_room</span>
+                    <p className="font-display mt-4 text-2xl font-bold text-on-surface">This session has ended.</p>
+                    <p className="mt-2 text-sm text-on-surface-variant">The host has closed or dissolved this room.</p>
+                    <a
+                        href="/"
+                        className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-primary-container px-6 py-2.5 font-display text-sm font-bold text-on-primary-container shadow-[0_0_15px_rgba(78,222,61,0.3)] transition-all hover:brightness-110"
+                    >
+                        <span>Back Home</span>
+                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                     </a>
                 </div>
             </main>
@@ -202,420 +228,634 @@ export default function Show({ session }: { session: SessionProps }) {
     };
 
     return (
-        <main className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
-            {/* FR-1.6 join-instruction bar */}
-            <div className="border-b border-white/10 bg-slate-900/80 px-6 py-2 text-center text-xs text-slate-400 backdrop-blur">
-                Joining late? Open{' '}
-                <span className="font-mono text-cyan-400">
-                    {typeof window !== 'undefined'
-                        ? `${window.location.origin}/join/${data.code}`
-                        : `/join/${data.code}`}
-                </span>{' '}
-                and enter the PIN from your host.
+        <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0b1326] font-sans text-on-surface antialiased selection:bg-primary/30">
+            {/* Atmospheric Background Gradients */}
+            <div className="ambient-glow-cyan pointer-events-none fixed inset-0 z-0" />
+            <div className="ambient-glow-pink pointer-events-none fixed inset-0 z-0" />
+
+            {/* Top Late-Join Banner */}
+            <div className="relative z-10 border-b border-secondary/20 bg-secondary-container/10 px-4 py-2 text-center font-mono text-xs tracking-wider text-secondary backdrop-blur-md sm:px-6">
+                <div className="mx-auto flex max-w-6xl items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        info
+                    </span>
+                    <span>
+                        Joining late? Open{' '}
+                        <span className="font-bold text-on-surface underline">
+                            {typeof window !== 'undefined'
+                                ? `${window.location.origin}/join/${data.code}`
+                                : `/join/${data.code}`}
+                        </span>{' '}
+                        and enter the PIN.
+                    </span>
+                </div>
             </div>
+
             <ServerStatus />
 
-            {/* Quiz extension (phase-2 M) */}
-            {data.quiz && data.quiz.status === 'live' && (
-                <div className="mb-6 rounded-2xl border border-cyan-400/20 bg-slate-900 p-5">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-cyan-300">
-                            Quiz · Q{data.quiz.current_index + 1}/{data.quiz.total}
-                        </h3>
-                        {data.me && data.me.id === (data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.leader_id ?? -1) ? (
-                            data.quiz.my_answer !== null && data.quiz.my_answer !== undefined ? (
-                                <span className="text-sm text-emerald-400">Answered ✓</span>
-                            ) : (
-                                <span className="text-sm text-slate-400">Leader answers for the group</span>
-                            )
-                        ) : (
-                            <span className="text-sm text-slate-400">
-                                {data.quiz.my_answer !== null && data.quiz.my_answer !== undefined ? 'Answered ✓' : 'waiting for your leader…'}
-                            </span>
-                        )}
-                    </div>
-                    <p className="mt-3 text-lg font-semibold text-slate-100">{data.quiz.question?.q}</p>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {data.quiz.question?.options.map((opt: string, oi: number) => {
-                            const answered = data.quiz.my_answer !== null && data.quiz.my_answer !== undefined;
-                            const isLeader =
-                                data.me && data.me.id === (data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.leader_id ?? -1);
-                            return (
-                                <button
-                                    key={oi}
-                                    type="button"
-                                    disabled={!isLeader || answered}
-                                    onClick={() => {
-                                        setQuizPick(oi);
-                                        const gid = data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.id;
-                                        if (gid) mutate(`/s/${data.code}/groups/${gid}/quiz/answer`, { question_index: data.quiz.current_index, answer_index: oi });
-                                    }}
-                                    className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
-                                        answered && quizPick === oi
-                                            ? 'border-emerald-400 bg-emerald-400/10 text-emerald-300'
-                                            : answered
-                                              ? 'border-white/10 bg-slate-950 text-slate-500'
-                                              : 'border-white/10 bg-slate-950 text-slate-200 hover:border-cyan-400/50'
-                                    }`}
-                                >
-                                    {String.fromCharCode(65 + oi)}. {opt}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    <div className="mt-4 border-t border-white/10 pt-3">
-                        <span className="text-xs uppercase tracking-wide text-slate-500">Leaderboard</span>
-                        <ol className="mt-1 space-y-1 text-sm">
-                            {data.quiz.leaderboard?.map((l: { name: string; points: number }, i: number) => (
-                                <li key={l.name} className="flex items-center justify-between text-slate-300">
-                                    <span>
-                                        {i + 1}. {l.name}
-                                    </span>
-                                    <span className="text-cyan-300">{l.points} pts</span>
-                                </li>
-                            ))}
-                        </ol>
+            {/* Action error banner */}
+            {actionError && (
+                <div className="relative z-10 mx-auto mt-4 w-full max-w-6xl px-4">
+                    <div className="flex items-center justify-between rounded-xl border border-error/40 bg-error-container/20 px-4 py-2.5 text-xs text-error backdrop-blur-md">
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px]">error</span>
+                            <span>{actionError}</span>
+                        </div>
+                        <button type="button" onClick={() => setActionError(null)} className="text-on-surface-variant hover:text-on-surface">
+                            ✕
+                        </button>
                     </div>
                 </div>
             )}
 
-            <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
-                <header className="flex items-center justify-between">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight">
-                            <Logo className="h-7 w-7" />
-                            Groupify
-                        </h1>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                            {(liveCount ?? data.presence)} online · {data.pool.length} in the pool
-                        </p>
+            {/* Main Content Area */}
+            <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 pb-28">
+                {/* Header: Identity, Live Pulse, Room Code & PIN */}
+                <header className="flex flex-wrap items-center justify-between gap-4 pb-4">
+                    <div className="flex items-center gap-3">
+                        <Logo className="h-8 w-8 text-primary drop-shadow-[0_0_15px_rgba(109,252,87,0.3)]" />
+                        <div>
+                            <h1 className="font-display text-xl font-extrabold tracking-tight text-on-surface sm:text-2xl">
+                                Groupify
+                            </h1>
+                            <p className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-on-surface-variant">
+                                <span className="h-2 w-2 animate-pulse rounded-full bg-primary shadow-[0_0_6px_#6dfc57]" />
+                                <span>{(liveCount ?? data.presence)} online</span>
+                                <span>·</span>
+                                <span>{data.pool.length} in Pool</span>
+                            </p>
+                        </div>
                     </div>
-                    <span className="flex items-center gap-3">
+
+                    <div className="flex items-center gap-3">
                         {data.dissolve_at && (
-                            <span className="font-mono text-xs text-rose-300">
-                                groups dissolve in {Math.max(0, Math.ceil((new Date(data.dissolve_at).getTime() - nowTick) / 1000))}s
-                            </span>
+                            <div className="flex items-center gap-1.5 rounded-full border border-tertiary-container/30 bg-tertiary-container/10 px-3 py-1 font-mono text-xs text-[#ec4899]">
+                                <span className="material-symbols-outlined text-[14px]">timer</span>
+                                <span>
+                                    {Math.max(0, Math.ceil((new Date(data.dissolve_at).getTime() - nowTick) / 1000))}s left
+                                </span>
+                            </div>
                         )}
-                        <span className="flex items-center gap-2 font-mono text-sm text-cyan-400">
-                            <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
-                            {data.code}
-                        </span>
-                    </span>
+
+                        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-surface-container-high/80 px-3.5 py-1.5 backdrop-blur-md">
+                            <span className="font-mono text-xs font-semibold uppercase tracking-widest text-on-surface-variant">
+                                Session
+                            </span>
+                            <span className="font-mono text-sm font-bold text-secondary">
+                                {data.code}
+                            </span>
+                        </div>
+                    </div>
                 </header>
 
+                {/* Profile Module: Glass Card */}
                 {data.me && (
-                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4">
-                        {data.me.pooled ? (
-                            <p>
-                                <span className="font-bold">{data.me.name}</span> — you&rsquo;re in the
-                                pool ({data.pool.length}).
-                            </p>
-                        ) : (
-                            <p>
-                                <span className="font-bold">{data.me.name}</span> — you&rsquo;re in{' '}
-                                <span className="text-emerald-400">{meIn?.name}</span>.
-                            </p>
+                    <section className="glass-panel group relative mt-4 overflow-hidden rounded-2xl p-5 shadow-xl transition-all">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3.5">
+                                <div className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-surface-container-high font-display text-lg font-bold text-primary shadow-inner">
+                                    {data.me.name.charAt(0).toUpperCase()}
+                                    <div className="absolute -right-0.5 -bottom-0.5 rounded-full border border-white/10 bg-surface-container p-0.5">
+                                        <span className="material-symbols-outlined text-[13px] text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                            check_circle
+                                        </span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h2 className="font-display text-base font-bold text-on-surface sm:text-lg">
+                                        {data.me.name} <span className="text-sm font-normal text-on-surface-variant">(You)</span>
+                                    </h2>
+                                    <p className="mt-0.5 font-mono text-xs text-on-surface-variant">
+                                        {data.me.pooled ? (
+                                            <span>you&rsquo;re in the pool ({data.pool.length}).</span>
+                                        ) : (
+                                            <span>you&rsquo;re in <span className="font-semibold text-primary">{meIn?.name}</span>.</span>
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2.5">
+                                {canMutate && data.me.pooled && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => mutate(`/s/${data.code}/match-me`)}
+                                            className="flex items-center gap-1.5 rounded-xl bg-secondary px-4 py-2.5 font-display text-xs font-bold text-on-secondary shadow-[0_0_15px_rgba(76,215,246,0.3)] transition-all duration-200 hover:brightness-110 active:scale-95"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]">bolt</span>
+                                            <span>Match me</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCreating((c) => !c)}
+                                            className="flex items-center gap-1.5 rounded-xl bg-primary-container px-4 py-2.5 font-display text-xs font-bold text-on-primary-container shadow-[0_0_20px_rgba(78,222,61,0.25)] transition-all duration-200 hover:brightness-110 active:scale-95"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]">add</span>
+                                            <span>CREATE NEW GROUP</span>
+                                        </button>
+                                    </>
+                                )}
+                                {canMutate && meIn && (
+                                    <button
+                                        type="button"
+                                        onClick={() => mutate(`/s/${data.code}/groups/${meIn.id}/leave`)}
+                                        className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-surface-variant/40 px-4 py-2 font-sans text-xs font-bold text-on-surface-variant transition-all hover:bg-surface-variant hover:text-on-surface"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">logout</span>
+                                        <span>Leave {meIn.name}</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Expandable Group Creation Form */}
+                        {creating && canMutate && (
+                            <form
+                                className="mt-5 border-t border-white/10 pt-5"
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    submitCreate();
+                                }}
+                            >
+                                <p className="font-mono text-xs font-bold uppercase tracking-wider text-secondary">
+                                    Create a New Team
+                                </p>
+                                <div className="mt-3 flex flex-col gap-3">
+                                    <input
+                                        type="text"
+                                        placeholder="Group name (optional — auto-named)"
+                                        value={createName}
+                                        onChange={(e) => setCreateName(e.target.value)}
+                                        className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
+                                    />
+                                    {data.config.fields.map((f) => (
+                                        <input
+                                            key={f.name}
+                                            type="text"
+                                            placeholder={`${f.name}${f.required ? ' *' : ''}`}
+                                            value={fieldValues[f.name] ?? ''}
+                                            onChange={(e) => setFieldValues((v) => ({ ...v, [f.name]: e.target.value }))}
+                                            className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
+                                        />
+                                    ))}
+                                </div>
+                                <div className="mt-4 flex gap-2">
+                                    <button
+                                        className="rounded-xl bg-primary-container px-6 py-2 font-display text-xs font-bold text-on-primary-container shadow-[0_0_15px_rgba(78,222,61,0.25)] transition-all hover:brightness-110"
+                                    >
+                                        Create
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCreating(false)}
+                                        className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
                         )}
-                        {canMutate &&
-                            data.me.pooled && (
-                                <span className="flex gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => mutate(`/s/${data.code}/match-me`)}
-                                        className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-bold text-deep-ink transition active:scale-[0.97]"
-                                    >
-                                        ⚡ Match me
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setCreating((c) => !c)}
-                                        className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-bold text-emerald-950 transition active:scale-[0.97]"
-                                    >
-                                        + Create New Group
-                                    </button>
+                    </section>
+                )}
+
+                {/* Quiz Extension Card */}
+                {data.quiz && data.quiz.status === 'live' && (
+                    <div className="glass-panel relative mt-6 overflow-hidden rounded-2xl border-secondary/30 p-5 shadow-2xl backdrop-blur-xl">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-secondary text-[20px]">quiz</span>
+                                <h3 className="font-display text-base font-bold text-secondary">
+                                    Live Quiz · Question {data.quiz.current_index + 1} of {data.quiz.total}
+                                </h3>
+                            </div>
+                            {data.me && data.me.id === (data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.leader_id ?? -1) ? (
+                                data.quiz.my_answer !== null && data.quiz.my_answer !== undefined ? (
+                                    <span className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 font-mono text-xs font-bold text-primary">
+                                        <span className="material-symbols-outlined text-[14px]">check</span> Answered
+                                    </span>
+                                ) : (
+                                    <span className="rounded-full bg-secondary/10 px-3 py-1 font-mono text-xs font-bold text-secondary">
+                                        Leader answers for team
+                                    </span>
+                                )
+                            ) : (
+                                <span className="font-mono text-xs text-on-surface-variant">
+                                    {data.quiz.my_answer !== null && data.quiz.my_answer !== undefined
+                                        ? '✓ Team answered'
+                                        : 'Waiting for leader…'}
                                 </span>
                             )}
-                        {canMutate && meIn && (
-                            <button
-                                type="button"
-                                onClick={() => mutate(`/s/${data.code}/groups/${meIn.id}/leave`)}
-                                className="rounded-full border border-white/10 px-5 py-2 text-sm text-slate-300 transition hover:bg-slate-800"
-                            >
-                                Leave {meIn.name}
-                            </button>
+                        </div>
+
+                        <p className="mt-4 font-display text-lg font-semibold text-on-surface">
+                            {data.quiz.question?.q}
+                        </p>
+
+                        <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                            {data.quiz.question?.options.map((opt: string, oi: number) => {
+                                const answered = data.quiz.my_answer !== null && data.quiz.my_answer !== undefined;
+                                const isLeader =
+                                    data.me && data.me.id === (data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.leader_id ?? -1);
+                                const isPick = quizPick === oi || data.quiz?.my_answer === oi;
+
+                                return (
+                                    <button
+                                        key={oi}
+                                        type="button"
+                                        disabled={!isLeader || answered}
+                                        onClick={() => {
+                                            setQuizPick(oi);
+                                            const gid = data.groups.find((g) => g.members.some((m) => m.id === data.me?.id))?.id;
+                                            if (gid) mutate(`/s/${data.code}/groups/${gid}/quiz/answer`, { question_index: data.quiz.current_index, answer_index: oi });
+                                        }}
+                                        className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                                            isPick
+                                                ? 'border-primary bg-primary/10 text-primary shadow-[0_0_15px_rgba(109,252,87,0.2)]'
+                                                : answered
+                                                  ? 'border-white/5 bg-[#060e20]/60 text-on-surface-variant/40'
+                                                  : 'border-white/10 bg-[#060e20] text-on-surface hover:border-secondary/50 hover:bg-surface-variant/40'
+                                        }`}
+                                    >
+                                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-bold ${
+                                            isPick ? 'bg-primary text-on-primary-container' : 'bg-surface-variant text-on-surface-variant'
+                                        }`}>
+                                            {String.fromCharCode(65 + oi)}.
+                                        </span>
+                                        <span className="text-sm font-medium">{opt}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {data.quiz.leaderboard && data.quiz.leaderboard.length > 0 && (
+                            <div className="mt-5 border-t border-white/10 pt-3.5">
+                                <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                                    Live Leaderboard
+                                </span>
+                                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                    {data.quiz.leaderboard.slice(0, 4).map((l: { name: string; points: number }, i: number) => (
+                                        <div key={l.name} className="flex items-center justify-between rounded-lg border border-white/5 bg-surface-container/60 px-3 py-1.5 text-xs">
+                                            <span className="truncate font-medium text-on-surface">{i + 1}. {l.name}</span>
+                                            <span className="font-mono font-bold text-secondary">{l.points} pts</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                     </div>
                 )}
 
-                {creating && canMutate && (
-                    <form
-                        className="mt-4 rounded-2xl border border-cyan-400/30 bg-slate-900 p-5"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            submitCreate();
-                        }}
-                    >
-                        <p className="text-sm font-bold uppercase tracking-wide text-cyan-400">Create a group</p>
+                {/* Search & Filter Controls */}
+                <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative flex-1">
+                        <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
+                            search
+                        </span>
                         <input
                             type="text"
-                            placeholder="Group name (optional — auto-named)"
-                            value={createName}
-                            onChange={(e) => setCreateName(e.target.value)}
-                            className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-2.5 outline-none focus:border-cyan-400"
+                            placeholder="Find a team or topic…"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-surface-container-high/80 py-2.5 pl-10 pr-4 font-sans text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
                         />
-                        {data.config.fields.map((f) => (
+                    </div>
+                    <label className="group flex shrink-0 cursor-pointer items-center gap-2 select-none">
+                        <div className="relative flex h-5 w-5 items-center justify-center rounded-md border border-white/20 bg-surface-container transition-colors group-hover:border-primary/50">
                             <input
-                                key={f.name}
-                                type="text"
-                                placeholder={`${f.name}${f.required ? ' *' : ''}`}
-                                value={fieldValues[f.name] ?? ''}
-                                onChange={(e) => setFieldValues((v) => ({ ...v, [f.name]: e.target.value }))}
-                                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-2.5 outline-none focus:border-cyan-400"
+                                type="checkbox"
+                                checked={openOnly}
+                                onChange={(e) => setOpenOnly(e.target.checked)}
+                                className="peer sr-only"
                             />
-                        ))}
-                        <button
-                            type="submit"
-                            className="mt-4 rounded-xl bg-emerald-400 px-5 py-2 text-sm font-bold text-emerald-950"
-                        >
-                            Create
-                        </button>
-                    </form>
-                )}
-
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <input
-                        type="text"
-                        placeholder="Search groups or topics…"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="w-full rounded-full border border-white/10 bg-slate-900 px-4 py-2.5 outline-none focus:border-cyan-400"
-                    />
-                    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-slate-400">
-                        <input
-                            type="checkbox"
-                            checked={openOnly}
-                            onChange={(e) => setOpenOnly(e.target.checked)}
-                            className="rounded border-white/10 bg-slate-900 accent-cyan-400"
-                        />
-                        Open slots only
+                            <span className="material-symbols-outlined absolute text-[16px] text-primary opacity-0 transition-opacity peer-checked:opacity-100" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                check
+                            </span>
+                        </div>
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-on-surface-variant transition-colors group-hover:text-on-surface">
+                            Open Only
+                        </span>
                     </label>
-                </div>
+                </section>
 
-                <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {/* Group Grid Cards */}
+                <section className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                     {groups.length === 0 && (
-                        <p className="col-span-full py-10 text-center text-sm text-slate-500">
-                            No groups match. Be the first to create one.
-                        </p>
+                        <div className="glass-panel col-span-full rounded-2xl border-dashed border-white/15 p-12 text-center">
+                            <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">groups</span>
+                            <p className="mt-2 font-display text-base font-bold text-on-surface">No groups match your search.</p>
+                            <p className="mt-1 text-xs text-on-surface-variant">Be the first to create one or adjust your filters.</p>
+                        </div>
                     )}
+
                     {groups.map((g) => {
                         const full = g.open_slots <= 0;
                         const isFlashing = flash?.groupId === g.id;
                         const flashStyle =
                             isFlashing && flash?.kind === 'joined'
-                                ? 'border-emerald-400 shadow-[0_0_20px_rgba(78,222,163,0.35)]'
+                                ? 'border-primary shadow-[0_0_20px_rgba(109,252,87,0.4)]'
                                 : isFlashing && flash?.kind === 'left'
-                                  ? 'border-rose-400/60 shadow-[0_0_20px_rgba(244,63,94,0.25)]'
+                                  ? 'border-error shadow-[0_0_20px_rgba(255,180,171,0.3)]'
                                   : 'border-white/10';
+
                         return (
                             <article
                                 key={g.id}
-                                className={`relative overflow-hidden rounded-2xl border p-5 transition ${
-                                    full ? 'opacity-70' : 'hover:border-emerald-400/50'
-                                } ${flashStyle} bg-slate-900`}
+                                className={`glass-panel group relative flex flex-col justify-between overflow-hidden rounded-2xl p-5 shadow-lg transition-all duration-300 ${
+                                    full ? 'border-[#ec4899]/40 bg-[#ec4899]/5' : 'hover:border-primary/40'
+                                } ${flashStyle}`}
                             >
-                                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400 opacity-40" />
-                                <div className="flex items-start justify-between">
-                                    <h2 className={`text-lg font-bold ${full ? 'line-through decoration-rose-400' : ''}`}>
-                                        {g.name}
-                                    </h2>
-                                    <div className="flex gap-1">
-                                        {Array.from({ length: g.capacity }).map((_, i) => (
-                                            <span
-                                                key={i}
-                                                className={`h-2.5 w-2.5 rounded-full ${
-                                                    i < g.member_count
-                                                        ? 'bg-cyan-400 shadow-[0_0_6px_#06B6D4]'
-                                                        : 'border border-white/20'
-                                                }`}
-                                            />
-                                        ))}
+                                {/* Top Gradient Accent */}
+                                <div className={`absolute inset-x-0 top-0 h-1 transition-opacity ${
+                                    full
+                                        ? 'bg-[#ec4899]'
+                                        : 'bg-gradient-to-r from-primary to-secondary opacity-50 group-hover:opacity-100'
+                                }`} />
+
+                                <div>
+                                    {/* Card Header: Group Name & Slot Dots */}
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <h2 className={`font-display text-lg font-bold text-on-surface ${
+                                                full ? 'line-through decoration-white/30 text-on-surface-variant' : ''
+                                            }`}>
+                                                {g.name}
+                                            </h2>
+                                            {full && (
+                                                <span className="rounded bg-[#ec4899] px-2 py-0.5 font-mono text-[9px] font-bold tracking-widest text-white uppercase shadow-[0_0_8px_rgba(236,72,153,0.4)]">
+                                                    FULL
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Capacity Slot Dots */}
+                                        <div className="flex shrink-0 items-center gap-1.5 pt-1" title={`${g.member_count}/${g.capacity} filled`}>
+                                            {Array.from({ length: g.capacity }).map((_, i) => (
+                                                <span
+                                                    key={i}
+                                                    className={
+                                                        full
+                                                            ? 'slot-dot slot-dot-full'
+                                                            : i < g.member_count
+                                                              ? 'slot-dot slot-dot-filled'
+                                                              : 'slot-dot slot-dot-empty'
+                                                    }
+                                                />
+                                            ))}
+                                        </div>
                                     </div>
+
+                                    {/* Topic / Fields */}
+                                    {fieldNames.map((f) => (
+                                        <p key={f} className="mt-1 font-mono text-xs uppercase tracking-wide text-secondary">
+                                            {f}: {g.field_values[f] ?? <span className="italic opacity-50">not set</span>}
+                                        </p>
+                                    ))}
+
+                                    {/* Leader's Pending Requests Panel */}
+                                    {data.me?.id === g.leader_id && g.pending && g.pending.length > 0 && (
+                                        <div className="mt-3.5 rounded-xl border border-secondary/30 bg-[#060e20] p-2.5">
+                                            <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">
+                                                Pending Join Requests
+                                            </p>
+                                            <div className="mt-2 space-y-1.5">
+                                                {g.pending.map((p) => (
+                                                    <div key={p.id} className="flex items-center justify-between gap-2 text-xs">
+                                                        <span className="truncate font-medium text-on-surface">{p.name}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                aria-label={`approve ${p.name}`}
+                                                                onClick={() =>
+                                                                    mutate(`/s/${data.code}/groups/${g.id}/requests/${p.id}/approve`)
+                                                                }
+                                                                className="rounded-lg bg-primary-container px-2 py-0.5 text-xs font-bold text-on-primary-container transition-all hover:brightness-110"
+                                                            >
+                                                                ✓
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                aria-label={`reject ${p.name}`}
+                                                                onClick={() =>
+                                                                    mutate(`/s/${data.code}/groups/${g.id}/requests/${p.id}/reject`)
+                                                                }
+                                                                className="rounded-lg bg-error-container/40 px-2 py-0.5 text-xs font-bold text-error transition-all hover:bg-error-container"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Members List */}
+                                    <ul className="mt-4 space-y-1.5 text-xs text-on-surface">
+                                        {g.members.map((m) => (
+                                            <li key={m.id} className="flex items-center justify-between gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-surface-variant/30">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`h-1.5 w-1.5 rounded-full ${
+                                                        m.role === 'leader' ? 'bg-primary shadow-[0_0_6px_#6dfc57]' : 'bg-on-surface-variant/40'
+                                                    }`} />
+                                                    <span className={m.role === 'leader' ? 'font-semibold text-on-surface' : 'text-on-surface-variant'}>
+                                                        {m.name}
+                                                    </span>
+                                                    {m.role === 'leader' && (
+                                                        <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-mono font-bold text-primary">
+                                                            lead
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {canMutate &&
+                                                    data.me?.id === g.leader_id &&
+                                                    m.role !== 'leader' &&
+                                                    m.id !== data.me.id && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                mutate(`/s/${data.code}/groups/${g.id}/members/${m.id}/kick`)
+                                                            }
+                                                            className="rounded bg-error-container/30 px-1.5 py-0.5 text-[10px] font-mono text-error hover:bg-error-container/50"
+                                                        >
+                                                            kick
+                                                        </button>
+                                                    )}
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </div>
 
-                                {fieldNames.map((f) => (
-                                    <p key={f} className="mt-2 text-sm text-slate-400">
-                                        <span className="uppercase tracking-wide text-cyan-400">{f}: </span>
-                                        {g.field_values[f] ?? <span className="italic">not set</span>}
+                                {/* Card Footer: Slot Count & Join Action */}
+                                <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+                                    <p className="font-mono text-xs text-on-surface-variant">
+                                        {full ? (
+                                            <span className="font-bold text-[#ec4899]">FULL</span>
+                                        ) : (
+                                            <span>{g.open_slots} open</span>
+                                        )}
                                     </p>
-                                ))}
 
-                                {data.me?.id === g.leader_id &&
-                                    g.pending?.length ? (
-                                    <div className="mt-3 rounded-xl border border-cyan-400/20 bg-slate-950 p-2">
-                                        <p className="text-[10px] uppercase tracking-widest text-cyan-400">
-                                            Pending requests
-                                        </p>
-                                        {g.pending?.map((p) => (
-                                            <div key={p.id} className="mt-1 flex items-center justify-between gap-2 text-xs">
-                                                <span className="truncate">{p.name}</span>
-                                                <span className="flex gap-1">
-                                                    <button
-                                                        type="button"
-                                                        aria-label={`approve ${p.name}`}
-                                                        onClick={() =>
-                                                            mutate(`/s/${data.code}/groups/${g.id}/requests/${p.id}/approve`)
-                                                        }
-                                                        className="rounded bg-emerald-400/15 px-2 py-0.5 text-emerald-300"
-                                                    >
-                                                        ✓
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        aria-label={`reject ${p.name}`}
-                                                        onClick={() =>
-                                                            mutate(`/s/${data.code}/groups/${g.id}/requests/${p.id}/reject`)
-                                                        }
-                                                        className="rounded bg-rose-400/15 px-2 py-0.5 text-rose-300"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : null}
-
-                                <ul className="mt-3 space-y-1 text-sm text-slate-300">
-                                    {g.members.map((m) => (
-                                        <li key={m.id} className="flex items-center gap-2">
-                                            <span
-                                                className={`h-1.5 w-1.5 rounded-full ${
-                                                    m.role === 'leader' ? 'bg-emerald-400' : 'bg-slate-600'
-                                                }`}
-                                            />
-                                            {m.name}
-                                            {m.role === 'leader' && (
-                                                <span className="text-xs text-emerald-400">lead</span>
-                                            )}
-                                            {canMutate &&
-                                                data.me?.id === g.leader_id &&
-                                                m.role !== 'leader' &&
-                                                m.id !== data.me.id && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            mutate(`/s/${data.code}/groups/${g.id}/members/${m.id}/kick`)
-                                                        }
-                                                        className="ml-auto rounded bg-rose-400/15 px-1.5 py-0.5 text-[10px] text-rose-300"
-                                                    >
-                                                        kick
-                                                    </button>
-                                                )}
-                                        </li>
-                                    ))}
-                                </ul>
-
-                                <div className="mt-4 flex items-center justify-between">
-                                    <p className="text-xs text-slate-500">
-                                        {full ? 'FULL' : `${g.open_slots} open`}
-                                    </p>
                                     {canMutate && data.me?.pooled && !full && (
                                         <button
                                             type="button"
                                             onClick={() => mutate(`/s/${data.code}/groups/${g.id}/join`)}
-                                            className="rounded-full bg-emerald-400 px-4 py-1.5 text-xs font-bold text-emerald-950 transition active:scale-[0.97]"
+                                            className="rounded-xl bg-surface-bright px-4 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-primary border border-white/15 shadow-[0_0_10px_rgba(109,252,87,0.15)] transition-all hover:bg-surface-variant active:scale-95"
                                         >
                                             {data.config.rules.join_mode === 'approval' ? 'Request to join' : 'Join'}
+                                        </button>
+                                    )}
+                                    {full && (
+                                        <button
+                                            disabled
+                                            className="flex items-center gap-1 rounded-xl border border-white/5 bg-surface-container/50 px-3 py-1 font-mono text-xs uppercase tracking-wider text-on-surface-variant/40 cursor-not-allowed"
+                                        >
+                                            <span className="material-symbols-outlined text-[13px]">lock</span>
+                                            <span>Closed</span>
                                         </button>
                                     )}
                                 </div>
                             </article>
                         );
                     })}
-                </div>
-            </div>
-            {data.config.rules.chat_enabled && (
-                <section className="mx-auto mt-8 w-full max-w-6xl px-4">
+                </section>
+
+                {/* Chat Drawer */}
+                {data.config.rules.chat_enabled && (
+                    <section className="mt-8">
+                        <button
+                            type="button"
+                            onClick={() => setChatOpen((o) => !o)}
+                            className="glass-panel flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-on-surface transition-all hover:border-primary/40"
+                        >
+                            <span className="material-symbols-outlined text-secondary text-[18px]">forum</span>
+                            <span>Chat</span>
+                            <span className="font-mono text-xs text-on-surface-variant">{chatOpen ? '▾' : '▸'}</span>
+                        </button>
+
+                        {chatOpen && (
+                            <div className="glass-panel mt-3 rounded-2xl p-4 shadow-2xl backdrop-blur-xl">
+                                <div className="max-h-64 space-y-2.5 overflow-y-auto pr-2">
+                                    {messages.length === 0 && (
+                                        <p className="py-6 text-center font-mono text-xs text-on-surface-variant/50">
+                                            No messages yet. Say hello to the room!
+                                        </p>
+                                    )}
+                                    {messages.map((m) => (
+                                        <div key={m.id} className="rounded-lg bg-[#060e20]/60 p-2.5 text-xs">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="font-bold text-secondary">{m.author}</span>
+                                                <span className="font-mono text-[10px] text-on-surface-variant/60">
+                                                    {new Date(m.at).toLocaleTimeString()}
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 text-on-surface">{m.body}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="mt-4 flex flex-col gap-2.5">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Post to the room…"
+                                            value={globalDraft}
+                                            onChange={(e) => setGlobalDraft(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && globalDraft.trim()) {
+                                                    const body = globalDraft;
+                                                    setGlobalDraft('');
+                                                    void fetch(`/s/${data.code}/messages`, {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            Accept: 'application/json',
+                                                            'X-Device-Token': deviceToken,
+                                                            'X-XSRF-TOKEN': decodeURIComponent(
+                                                                document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                                            ),
+                                                        },
+                                                        body: JSON.stringify({ scope: 'global', body }),
+                                                    }).then((r) => { if (r.ok) refetch(); });
+                                                }
+                                            }}
+                                            className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3.5 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-secondary focus:outline-none transition-all"
+                                        />
+                                    </div>
+
+                                    {meIn && (
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder={`Message ${meIn.name}…`}
+                                                value={groupDraft}
+                                                onChange={(e) => setGroupDraft(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && groupDraft.trim()) {
+                                                        const body = groupDraft;
+                                                        setGroupDraft('');
+                                                        void fetch(`/s/${data.code}/messages`, {
+                                                            method: 'POST',
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                                Accept: 'application/json',
+                                                                'X-Device-Token': deviceToken,
+                                                                'X-XSRF-TOKEN': decodeURIComponent(
+                                                                    document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
+                                                                ),
+                                                            },
+                                                            body: JSON.stringify({ scope: 'group', group_id: meIn.id, body }),
+                                                        }).then((r) => { if (r.ok) refetch(); });
+                                                    }
+                                                }}
+                                                className="flex-1 rounded-xl border border-white/10 bg-[#060e20] px-3.5 py-2 text-xs text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:outline-none transition-all"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </section>
+                )}
+
+                <ComingNext />
+            </main>
+
+            {/* Mobile Bottom Navigation Bar */}
+            <nav className="glass-panel fixed bottom-0 left-0 z-40 flex h-16 w-full items-center justify-around border-t border-white/10 px-4 backdrop-blur-xl sm:hidden">
+                <button
+                    type="button"
+                    className="relative flex w-16 scale-95 flex-col items-center justify-center gap-1 font-bold text-primary transition-transform"
+                >
+                    <div className="absolute -top-3.5 h-1 w-8 rounded-b-md bg-primary shadow-[0_0_10px_rgba(109,252,87,0.5)]" />
+                    <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        groups
+                    </span>
+                    <span className="font-mono text-[10px] whitespace-nowrap">Live Room</span>
+                </button>
+
+                {data.config.rules.chat_enabled && (
                     <button
                         type="button"
                         onClick={() => setChatOpen((o) => !o)}
-                        className="rounded-full border border-white/10 bg-slate-900 px-4 py-2 text-sm text-slate-300"
+                        className={`flex w-16 flex-col items-center justify-center gap-1 transition-colors ${
+                            chatOpen ? 'text-secondary' : 'text-on-surface-variant hover:text-on-surface'
+                        }`}
                     >
-                        💬 Chat {chatOpen ? '▾' : '▸'}
+                        <span className="material-symbols-outlined text-[22px]">forum</span>
+                        <span className="font-mono text-[10px] whitespace-nowrap">Chat</span>
                     </button>
-                    {chatOpen && (
-                        <div className="mt-3 rounded-2xl border border-white/10 bg-slate-900 p-4">
-                            <div className="max-h-64 space-y-2 overflow-y-auto pr-2">
-                                {messages.length === 0 && <p className="text-sm text-slate-500">No messages yet.</p>}
-                                {messages.map((m) => (
-                                    <div key={m.id} className="text-sm">
-                                        <span className="font-semibold text-cyan-300">{m.author}</span>{' '}
-                                        <span className="text-slate-500">{new Date(m.at).toLocaleTimeString()}</span>
-                                        <p className="text-slate-200">{m.body}</p>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="mt-3 flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="Post to the room…"
-                                    value={globalDraft}
-                                    onChange={(e) => setGlobalDraft(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && globalDraft.trim()) {
-                                            const body = globalDraft;
-                                            setGlobalDraft('');
-                                            void fetch(`/s/${data.code}/messages`, {
-                                                method: 'POST',
-                                                headers: {
-                                                    'Content-Type': 'application/json',
-                                                    Accept: 'application/json',
-                                                    'X-Device-Token': deviceToken,
-                                                    'X-XSRF-TOKEN': decodeURIComponent(
-                                                        document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
-                                                    ),
-                                                },
-                                                body: JSON.stringify({ scope: 'global', body }),
-                                            }).then((r) => { if (r.ok) refetch(); });
-                                        }
-                                    }}
-                                    className="flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
-                                />
-                            </div>
-                            {meIn && (
-                                <div className="mt-3 flex gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Message your group…"
-                                        value={groupDraft}
-                                        onChange={(e) => setGroupDraft(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && groupDraft.trim()) {
-                                                const body = groupDraft;
-                                                setGroupDraft('');
-                                                void fetch(`/s/${data.code}/messages`, {
-                                                    method: 'POST',
-                                                    headers: {
-                                                        'Content-Type': 'application/json',
-                                                        Accept: 'application/json',
-                                                        'X-Device-Token': deviceToken,
-                                                        'X-XSRF-TOKEN': decodeURIComponent(
-                                                            document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? ''
-                                                        ),
-                                                    },
-                                                    body: JSON.stringify({ scope: 'group', group_id: meIn.id, body }),
-                                                }).then((r) => { if (r.ok) refetch(); });
-                                            }
-                                        }}
-                                        className="flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </section>
-            )}
-            <ComingNext />
-        </main>
+                )}
+
+                <a
+                    href="#coming-next"
+                    className="flex w-16 flex-col items-center justify-center gap-1 text-on-surface-variant transition-colors hover:text-on-surface"
+                >
+                    <span className="material-symbols-outlined text-[22px]">insights</span>
+                    <span className="font-mono text-[10px] whitespace-nowrap">Roadmap</span>
+                </a>
+            </nav>
+        </div>
     );
 }

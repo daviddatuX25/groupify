@@ -1,6 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
-
+import { Logo } from '@/components/Logo';
 export default function Join({ session }: { session: { code: string; status: string } }) {
     const [checking, setChecking] = useState(false);
 
@@ -48,8 +48,13 @@ export default function Join({ session }: { session: { code: string; status: str
 
     if (checking) {
         return (
-            <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100">
-                <p className="text-slate-400">Checking your seat…</p>
+            <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-surface px-6 text-on-surface">
+                <div className="glow-tr" />
+                <div className="glow-bl" />
+                <div className="relative z-10 flex flex-col items-center gap-3">
+                    <span className="material-symbols-outlined animate-spin text-3xl text-primary">refresh</span>
+                    <p className="font-mono text-sm tracking-wide text-on-surface-variant">Checking your seat…</p>
+                </div>
             </main>
         );
     }
@@ -60,61 +65,118 @@ export default function Join({ session }: { session: { code: string; status: str
     };
 
     return (
-        <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100">
-            <div className="w-full max-w-md">
-                <h1 className="text-2xl font-extrabold tracking-tight">
-                    <span className="text-slate-500">Join session</span>{' '}
-                    <span className="font-mono text-cyan-400">{session.code}</span>
-                </h1>
-                <p className="mt-2 text-slate-300">
-                    This is your session's <span className="text-slate-100">6-digit code</span>. Now enter the
-                    <span className="text-slate-100"> 4-digit PIN</span> your host is showing.
-                </p>
+        <div className="relative flex min-h-screen flex-col justify-between overflow-hidden bg-surface px-4 py-6 font-sans text-on-surface antialiased sm:px-8">
+            {/* Atmospheric Background Glows */}
+            <div className="glow-tr" />
+            <div className="glow-bl" />
 
-                <div className="mt-8 space-y-4">
-                    <div>
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            autoFocus
-                            placeholder="4-digit PIN"
-                            value={data.pin}
-                            onChange={(e) => setData('pin', e.target.value.replace(/\D/g, '').slice(0, 4))}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 font-mono text-2xl tracking-[0.5em] outline-none placeholder:font-sans placeholder:text-sm placeholder:tracking-normal placeholder:text-slate-500 focus:border-cyan-400"
-                        />
-                        {errors.pin && <p className="mt-1 text-sm text-rose-400">{errors.pin}</p>}
-                    </div>
-                    <div>
-                        <input
-                            type="text"
-                            placeholder="Your name"
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 outline-none focus:border-cyan-400"
-                        />
-                        {errors.name && <p className="mt-1 text-sm text-rose-400">{errors.name}</p>}
-                    </div>
-                    <div>
-                        <input
-                            type="email"
-                            placeholder="Email (optional)"
-                            value={data.email}
-                            onChange={(e) => setData('email', e.target.value)}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 outline-none focus:border-cyan-400"
-                        />
-                        {errors.email && <p className="mt-1 text-sm text-rose-400">{errors.email}</p>}
-                    </div>
+            {/* Header */}
+            <header className="relative z-10 mx-auto flex w-full max-w-md items-center justify-between py-4">
+                <div className="flex items-center gap-2">
+                    <Logo className="h-7 w-7 text-primary drop-shadow-[0_0_12px_rgba(109,252,87,0.3)]" />
+                    <h1 className="font-display text-xl font-extrabold tracking-tight text-on-surface">Groupify</h1>
                 </div>
+                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-surface-container-high px-3 py-1 shadow-inner">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-[#ec4899] shadow-[0_0_6px_#ec4899]" />
+                    <span className="font-mono text-xs font-bold tracking-wider text-on-surface">LIVE</span>
+                </div>
+            </header>
 
-                <button
-                    type="button"
-                    onClick={submit}
-                    disabled={processing || !data.pin || !data.name.trim()}
-                    className="mt-6 w-full rounded-2xl bg-emerald-400 py-3 font-bold text-emerald-950 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                    {processing ? 'Joining…' : 'Enter the room'}
-                </button>
-            </div>
-        </main>
+            {/* Main Form Card */}
+            <main className="relative z-10 mx-auto my-auto flex w-full max-w-md flex-col justify-center py-6">
+                <div className="glass-card flex flex-col gap-6 rounded-2xl p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+                    {/* Title Section */}
+                    <div className="flex flex-col items-center gap-1 text-center">
+                        <p className="font-mono text-xs font-semibold uppercase tracking-widest text-secondary">
+                            Join session
+                        </p>
+                        <h2 className="font-mono text-4xl font-extrabold tracking-[0.35em] text-primary drop-shadow-[0_0_18px_rgba(109,252,87,0.35)] sm:text-5xl ml-[0.35em]">
+                            {session.code}
+                        </h2>
+                        <p className="mt-1 text-xs text-on-surface-variant">
+                            Enter the 4-digit PIN your host is showing on screen.
+                        </p>
+                    </div>
+
+                    {/* Form Fields */}
+                    <form
+                        className="flex flex-col gap-4"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            submit();
+                        }}
+                    >
+                        {/* PIN Input */}
+                        <div>
+                            <label className="sr-only" htmlFor="pin">
+                                4-Digit PIN
+                            </label>
+                            <input
+                                id="pin"
+                                type="text"
+                                inputMode="numeric"
+                                autoFocus
+                                maxLength={4}
+                                placeholder="PIN"
+                                value={data.pin}
+                                onChange={(e) => setData('pin', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                className="w-full rounded-xl border border-white/10 bg-[#060e20] py-3.5 text-center font-mono text-3xl font-extrabold tracking-[0.5em] text-[#ec4899] placeholder:font-mono placeholder:text-sm placeholder:tracking-normal placeholder:text-on-surface-variant/30 focus:border-primary focus:shadow-[0_0_15px_rgba(78,222,61,0.25)] focus:outline-none transition-all"
+                            />
+                            {errors.pin && <p className="mt-1.5 font-mono text-xs text-error">{errors.pin}</p>}
+                        </div>
+
+                        {/* Name and Email */}
+                        <div className="flex flex-col gap-3">
+                            <div>
+                                <label className="sr-only" htmlFor="name">
+                                    Your Name
+                                </label>
+                                <input
+                                    id="name"
+                                    type="text"
+                                    placeholder="Your name"
+                                    value={data.name}
+                                    onChange={(e) => setData('name', e.target.value)}
+                                    className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
+                                />
+                                {errors.name && <p className="mt-1.5 font-mono text-xs text-error">{errors.name}</p>}
+                            </div>
+
+                            <div>
+                                <label className="sr-only" htmlFor="email">
+                                    Email (optional)
+                                </label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    placeholder="Email (optional)"
+                                    value={data.email}
+                                    onChange={(e) => setData('email', e.target.value)}
+                                    className="w-full rounded-xl border border-white/10 bg-[#060e20] px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary focus:shadow-[0_0_12px_rgba(78,222,61,0.2)] focus:outline-none transition-all"
+                                />
+                                {errors.email && <p className="mt-1.5 font-mono text-xs text-error">{errors.email}</p>}
+                            </div>
+                        </div>
+
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            disabled={processing || data.pin.length < 4 || !data.name.trim()}
+                            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary-container py-3.5 font-display text-base font-bold text-on-primary-container shadow-[0_0_20px_rgba(78,222,61,0.25)] transition-all duration-200 hover:shadow-[0_0_30px_rgba(78,222,61,0.4)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <span>{processing ? 'Entering…' : 'Enter the room'}</span>
+                            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                        </button>
+                    </form>
+                </div>
+            </main>
+
+            {/* Footer */}
+            <footer className="relative z-10 w-full py-4 text-center">
+                <p className="font-mono text-xs text-on-surface-variant/50">
+                    Self-hosted · ephemeral · no accounts
+                </p>
+            </footer>
+        </div>
     );
 }
