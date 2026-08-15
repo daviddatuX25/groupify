@@ -60,6 +60,13 @@ it('redirects the creator into the admin panel with the token', function () {
         ]));
 });
 
+it('keeps the creator in the admin panel after the token URL is cleaned', function () {
+    $this->post(route('sessions.store'))->assertRedirect();
+    $session = Session::query()->sole();
+
+    $this->get(route('admin.sessions.show', $session))->assertOk();
+});
+
 it('opens the admin panel with a valid token', function () {
     $session = Session::factory()->create();
 

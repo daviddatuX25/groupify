@@ -16,9 +16,18 @@ class AdminPanelController
      */
     public function show(Request $request, Session $session, SessionSnapshot $snapshot): Response
     {
-        $token = $request->query('token', $request->header('X-Admin-Token', ''));
+        $queryToken = $request->query('token');
+        $headerToken = $request->header('X-Admin-Token');
+        $token = is_string($queryToken) && $queryToken !== ''
+            ? $queryToken
+            : (is_string($headerToken) ? $headerToken : '');
+        if ($token === '') {
+            $sessionToken = $request->session()->get("groupify.admin.{$session->id}");
+            $token = is_string($sessionToken) ? $sessionToken : '';
+        }
 
-        abort_unless(hash_equals($session->admin_token, (string) $token), 404);
+        abort_unless(hash_equals($session->admin_token, $token), 404);
+        $request->session()->put("groupify.admin.{$session->id}", $session->admin_token);
 
         $board = $snapshot->build($session, null, true);
 

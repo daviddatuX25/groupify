@@ -1,5 +1,6 @@
 import { echo, useConnectionStatus } from '@laravel/echo-react';
 import ComingNext from '@/components/ComingNext';
+import { configureGroupifyEcho } from '@/lib/echo';
 import { Logo } from '@/components/Logo';
 import ServerStatus from '@/components/ServerStatus';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -84,27 +85,10 @@ export default function Show({ session }: { session: SessionProps }) {
     // 2-5: live events → refetch the snapshot; membership events flash the card (AD-6)
     useEffect(() => {
         if (typeof window === 'undefined') return;
+        configureGroupifyEcho({ deviceToken });
         const channel = echo().channel(`session.${data.code}`);
         CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, () => refetchRef.current()));
 
-        const echoInst = echo() as unknown as {
-            connector?: {
-                options?: { auth?: { headers?: Record<string, string> } };
-                pusher?: { config?: { auth?: { headers?: Record<string, string> } } };
-            };
-        };
-        if (echoInst?.connector?.options?.auth) {
-            echoInst.connector.options.auth.headers = {
-                ...echoInst.connector.options.auth.headers,
-                'X-Device-Token': deviceToken,
-            };
-        }
-        if (echoInst?.connector?.pusher?.config?.auth) {
-            echoInst.connector.pusher.config.auth.headers = {
-                ...echoInst.connector.pusher.config.auth.headers,
-                'X-Device-Token': deviceToken,
-            };
-        }
 
         // FR-3.5: live presence — the presence channel's member count is the
         // real online population (vs the seat count in data.presence).

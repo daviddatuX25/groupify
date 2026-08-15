@@ -1,5 +1,6 @@
 import { echo } from '@laravel/echo-react';
 import ComingNext from '@/components/ComingNext';
+import { configureGroupifyEcho } from '@/lib/echo';
 import ConfigEditor from './ConfigEditor';
 import PluginsPanel from './PluginsPanel';
 import PermsEditor from './PermsEditor';
@@ -121,26 +122,9 @@ export default function Show({
         try {
             if (typeof window === 'undefined') return;
             window.localStorage.setItem('groupify.admin_token', adminToken);
+            configureGroupifyEcho({ adminToken });
             const channel = echo().channel(`session.${data.code}`);
             CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));
-            const echoInst = echo() as unknown as {
-                connector?: {
-                    options?: { auth?: { headers?: Record<string, string> } };
-                    pusher?: { config?: { auth?: { headers?: Record<string, string> } } };
-                };
-            };
-            if (echoInst?.connector?.options?.auth) {
-                echoInst.connector.options.auth.headers = {
-                    ...echoInst.connector.options.auth.headers,
-                    'X-Admin-Token': adminToken,
-                };
-            }
-            if (echoInst?.connector?.pusher?.config?.auth) {
-                echoInst.connector.pusher.config.auth.headers = {
-                    ...echoInst.connector.pusher.config.auth.headers,
-                    'X-Admin-Token': adminToken,
-                };
-            }
 
             const presence = echo().join(`session.${data.code}`);
             presence.here((members: unknown[]) => setLiveCount(members.length));

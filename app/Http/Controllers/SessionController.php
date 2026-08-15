@@ -25,6 +25,10 @@ class SessionController
     public function store(Request $request): RedirectResponse
     {
         $session = $this->createSession($request);
+        $request->session()->put(
+            "groupify.admin.{$session->id}",
+            $session->admin_token,
+        );
 
         return redirect()->route('admin.sessions.show', [
             'session' => $session,

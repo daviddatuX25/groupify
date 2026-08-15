@@ -1,15 +1,9 @@
 import { createInertiaApp } from '@inertiajs/react';
-import { configureEcho } from '@laravel/echo-react';
+import { configureGroupifyEcho } from '@/lib/echo';
 
-// Tokens for the broadcast presence auth are read at module load — the echo
-// auth headers are static per instance. The device token is persisted before
-// navigation (join page); the admin token arrives in the initial Inertia page
-// props before the component can persist it, so read it from there too.
 const initialAdminToken = (() => {
     if (typeof window === 'undefined') return '';
     try {
-        // Inertia 3 embeds the initial page JSON as a script tag's TEXT
-        // (data-page="app"), not a data attribute on #app.
         const script = document.querySelector('script[data-page]');
         const page = script ? JSON.parse(script.textContent ?? '{}') : {};
         return (page.props?.session?.admin_token as string | undefined) ?? '';
@@ -17,43 +11,13 @@ const initialAdminToken = (() => {
         return '';
     }
 })();
-const deviceToken =
-    typeof window === 'undefined' ? '' : (window.localStorage.getItem('groupify.device_token') ?? '');
-const adminToken =
-    typeof window === 'undefined'
-        ? ''
-        : (window.localStorage.getItem('groupify.admin_token') ?? initialAdminToken);
 
-// Realtime transport: ALWAYS follow the page origin (localhost on the rig,
-// the computer's LAN IP for phones, the domain in production) — baking a fixed
-// host was the bug that broke phones (they dialed their own localhost). The
-// env override exists only for the dev stack (Vite on 5173 + WS on 8082).
-const envHost: string = import.meta.env.VITE_REVERB_HOST ?? '';
-const envPort: number = import.meta.env.VITE_REVERB_PORT ? Number(import.meta.env.VITE_REVERB_PORT) : 0;
-const wsHost =
-    typeof window !== 'undefined' && envHost === '' ? window.location.hostname : envHost;
-const wsPort =
-    envPort ||
-    (typeof window !== 'undefined'
-        ? Number(window.location.port || (window.location.protocol === 'https:' ? 443 : 80))
-        : 80);
-const forceTLS =
-    typeof window !== 'undefined'
-        ? window.location.protocol === 'https:'
-        : (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https';
-
-configureEcho({
-    broadcaster: 'reverb',
-    wsHost,
-    wsPort,
-    wssPort: wsPort,
-    forceTLS,
-    auth: {
-        headers: {
-            'X-Device-Token': deviceToken,
-            'X-Admin-Token': adminToken,
-        },
-    },
+configureGroupifyEcho({
+    deviceToken: typeof window === 'undefined' ? '' : (window.localStorage.getItem('groupify.device_token') ?? ''),
+    adminToken:
+        typeof window === 'undefined'
+            ? ''
+            : (window.localStorage.getItem('groupify.admin_token') ?? initialAdminToken),
 });
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
