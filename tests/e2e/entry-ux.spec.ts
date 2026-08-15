@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 async function createRoom(page: Page): Promise<string> {
     await page.goto('/new');
@@ -45,13 +46,35 @@ test('participant can save and remove a room from the homepage', async ({
     await expect(page.getByText(code, { exact: true })).toHaveCount(0);
 });
 
+test('continue advances setup without creating the room', async ({ page }) => {
+    const sessionPosts: string[] = [];
+    page.on('request', (request) => {
+        if (
+            request.method() === 'POST' &&
+            new URL(request.url()).pathname === '/sessions'
+        ) {
+            sessionPosts.push(request.url());
+        }
+    });
+
+    await page.goto('/new');
+    await page.getByRole('button', { name: /^continue$/i }).click();
+    await expect(
+        page.getByRole('heading', { name: /how long should it stay open/i }),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: /^continue$/i }).click();
+    await expect(
+        page.getByRole('heading', { name: 'Keep the results' }),
+    ).toBeVisible();
+    expect(sessionPosts).toHaveLength(0);
+});
+
 test('creating a room saves it on the host browser', async ({ page }) => {
     await page.goto('/new');
     await page.evaluate(() => localStorage.clear());
 
-    await page
-        .getByRole('button', { name: /go to duration step/i })
-        .click();
+    await page.getByRole('button', { name: /go to duration step/i }).click();
     await expect(
         page.getByRole('heading', { name: /how long should it stay open/i }),
     ).toBeVisible();
@@ -63,7 +86,8 @@ test('creating a room saves it on the host browser', async ({ page }) => {
     await page.getByRole('button', { name: /create room/i }).click();
     await adminNavigation;
 
-    const code = (await page.locator('body').innerText()).match(/\b\d{6}\b/)?.[0] ?? '';
+    const code =
+        (await page.locator('body').innerText()).match(/\b\d{6}\b/)?.[0] ?? '';
     expect(code).toMatch(/^\d{6}$/);
 
     await page.goto('/');

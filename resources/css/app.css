@@ -175,6 +175,17 @@ body {
     box-shadow: 0 0 12px rgba(78, 222, 61, 0.2);
 }
 
+input[type='datetime-local'] {
+    color-scheme: dark;
+}
+
+input[type='datetime-local']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.85;
+    filter: invert(82%) sepia(46%) saturate(731%) hue-rotate(151deg)
+        brightness(101%) contrast(95%);
+}
+
 /* Consistent select geometry: the native arrow stays inside the padded field. */
 select:not([multiple]) {
     appearance: none;

@@ -1,6 +1,6 @@
 import { Link, useForm } from '@inertiajs/react';
-import { useState  } from 'react';
-import type {FormEvent} from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { Logo } from '@/components/Logo';
 import { saveSession } from '@/lib/savedSessions';
 
@@ -123,15 +123,7 @@ export default function New() {
         errors.retention_days ??
         errors.end_mode ??
         errors.custom_ends_at;
-    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-
-        if (step < setupSteps.length - 1) {
-            setStep((current) => Math.min(setupSteps.length - 1, current + 1));
-
-            return;
-        }
-
+    const createSession = () => {
         post('/sessions', {
             onSuccess: (page) => {
                 const created = page.props.session as
@@ -146,6 +138,21 @@ export default function New() {
                 }
             },
         });
+    };
+
+    const handleContinue = () => {
+        if (step < setupSteps.length - 1) {
+            setStep((current) => Math.min(setupSteps.length - 1, current + 1));
+
+            return;
+        }
+
+        createSession();
+    };
+
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        handleContinue();
     };
 
     return (
@@ -330,23 +337,37 @@ export default function New() {
                             {data.end_mode === 'custom' && (
                                 <div className="mt-3 rounded-xl border border-secondary/30 bg-secondary/5 p-3">
                                     <label
-                                        className="block text-xs font-semibold text-on-surface"
+                                        className="flex items-center gap-1.5 text-xs font-semibold text-on-surface"
                                         htmlFor="custom-ends-at"
                                     >
+                                        <span
+                                            className="material-symbols-outlined text-[16px] text-secondary"
+                                            aria-hidden="true"
+                                        >
+                                            calendar_clock
+                                        </span>
                                         Room closing time
                                     </label>
-                                    <input
-                                        id="custom-ends-at"
-                                        type="datetime-local"
-                                        value={data.custom_ends_at}
-                                        onChange={(event) =>
-                                            setData(
-                                                'custom_ends_at',
-                                                event.target.value,
-                                            )
-                                        }
-                                        className="kinetic-input mt-2 w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
-                                    />
+                                    <div className="relative mt-2">
+                                        <span
+                                            className="material-symbols-outlined pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[18px] text-secondary"
+                                            aria-hidden="true"
+                                        >
+                                            schedule
+                                        </span>
+                                        <input
+                                            id="custom-ends-at"
+                                            type="datetime-local"
+                                            value={data.custom_ends_at}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'custom_ends_at',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="kinetic-input w-full rounded-xl py-2.5 pr-3 pl-10 text-sm outline-none focus:border-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
+                                        />
+                                    </div>
                                     {errors.custom_ends_at && (
                                         <p className="mt-2 text-xs text-error">
                                             {errors.custom_ends_at}
@@ -443,44 +464,24 @@ export default function New() {
                         >
                             Back
                         </button>
-                        {step < setupSteps.length - 1 ? (
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setStep((current) =>
-                                        Math.min(
-                                            setupSteps.length - 1,
-                                            current + 1,
-                                        ),
-                                    )
-                                }
-                                className="inline-flex items-center gap-2 rounded-xl bg-primary-container px-4 py-2.5 text-xs font-bold text-on-primary-container shadow-[0_0_20px_rgba(78,222,163,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_0_28px_rgba(78,222,163,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary active:scale-95"
+                        <button
+                            type="button"
+                            onClick={handleContinue}
+                            disabled={processing}
+                            className="inline-flex items-center gap-2 rounded-xl bg-primary-container px-4 py-2.5 text-xs font-bold text-on-primary-container shadow-[0_0_20px_rgba(78,222,163,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_0_28px_rgba(78,222,163,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            {step < setupSteps.length - 1
+                                ? 'Continue'
+                                : processing
+                                  ? 'Creating room...'
+                                  : 'Create room'}
+                            <span
+                                className="material-symbols-outlined text-[17px]"
+                                aria-hidden="true"
                             >
-                                Continue
-                                <span
-                                    className="material-symbols-outlined text-[17px]"
-                                    aria-hidden="true"
-                                >
-                                    arrow_forward
-                                </span>
-                            </button>
-                        ) : (
-                            <button
-                                type="submit"
-                                disabled={processing}
-                                className="inline-flex items-center gap-2 rounded-xl bg-primary-container px-4 py-2.5 text-xs font-bold text-on-primary-container shadow-[0_0_20px_rgba(78,222,163,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_0_28px_rgba(78,222,163,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                {processing
-                                    ? 'Creating room...'
-                                    : 'Create room'}
-                                <span
-                                    className="material-symbols-outlined text-[17px]"
-                                    aria-hidden="true"
-                                >
-                                    arrow_forward
-                                </span>
-                            </button>
-                        )}
+                                arrow_forward
+                            </span>
+                        </button>
                     </div>
                 </form>
 
