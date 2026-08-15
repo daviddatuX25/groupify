@@ -48,6 +48,7 @@ export default function Show({ session }: { session: SessionProps }) {
     const [groupDraft, setGroupDraft] = useState('');
     const [quizPick, setQuizPick] = useState<number | null>(null);
     const [nowTick, setNowTick] = useState(Date.now());
+    const [liveCount, setLiveCount] = useState<number | null>(null);
     const prevStatus = useRef<string | null>(null);
 
     const deviceToken =
@@ -84,6 +85,16 @@ export default function Show({ session }: { session: SessionProps }) {
         if (typeof window === 'undefined') return;
         const channel = echo().channel(`session.${data.code}`);
         CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, () => refetchRef.current()));
+
+        // FR-3.5: live presence — the presence channel's member count is the
+        // real online population (vs the seat count in data.presence).
+        const presence = echo().join(`session.${data.code}`) // Echo prepends the presence- prefix itself;
+        presence.here((members: unknown[]) => setLiveCount(members.length));
+        presence.joining(() => setLiveCount((c) => (c === null ? c : c + 1)));
+        presence.leaving((member: { name: string }) => {
+            setLiveCount((c) => (c === null ? c : Math.max(0, c - 1)));
+            void member;
+        });
         channel.listen('MessageCreated', () => refetchRef.current());
         channel.listen('MembershipChanged', (e: { group_id: number; action: string }) => {
             if (e.action === 'joined' || e.action === 'left') {
@@ -99,6 +110,7 @@ export default function Show({ session }: { session: SessionProps }) {
             CHANNEL_EVENTS.forEach((ev) => channel.stopListening(ev));
             channel.stopListening('MembershipChanged');
             echo().leaveChannel(`session.${data.code}`);
+            presence.leave();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.code, deviceToken]);
@@ -275,7 +287,7 @@ export default function Show({ session }: { session: SessionProps }) {
                             Groupify
                         </h1>
                         <p className="mt-0.5 text-xs text-slate-500">
-                            {data.presence} online · {data.pool.length} in the pool
+                            {(liveCount ?? data.presence)} online · {data.pool.length} in the pool
                         </p>
                     </div>
                     <span className="flex items-center gap-3">

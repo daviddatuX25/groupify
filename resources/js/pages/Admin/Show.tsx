@@ -45,6 +45,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [roleActions, setRoleActions] = useState('');
     const [modQueue, setModQueue] = useState<{ id: number; scope: string; author: string; body: string }[]>([]);
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
+    const [liveCount, setLiveCount] = useState<number | null>(null);
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
     if (typeof window !== 'undefined' && session.admin_token) {
@@ -108,10 +109,16 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
             window.localStorage.setItem('groupify.admin_token', adminToken);
             const channel = echo().channel(`session.${data.code}`);
             CHANNEL_EVENTS.forEach((ev) => channel.listen(ev, refetch));
+
+            const presence = echo().join(`session.${data.code}`) // Echo prepends the presence- prefix itself;
+            presence.here((members: unknown[]) => setLiveCount(members.length));
+            presence.joining(() => setLiveCount((c) => (c === null ? c : c + 1)));
+            presence.leaving(() => setLiveCount((c) => (c === null ? c : Math.max(0, c - 1))));
             setReady(true);
             return () => {
                 CHANNEL_EVENTS.forEach((ev) => channel.stopListening(ev));
                 echo().leaveChannel(`session.${data.code}`);
+                presence.leave();
             };
         } catch (err) {
             // eslint-disable-next-line no-console
@@ -210,7 +217,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                     <div className="flex items-center gap-3">
                         <span className="flex items-center gap-2 rounded-full border border-white/10 bg-slate-900 px-3 py-1 text-xs">
                             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                            {data.presence} online
+                            {(liveCount ?? data.presence)} online
                         </span>
                         <span className="font-mono text-rose-400">PIN: {session.pin}</span>
                     </div>

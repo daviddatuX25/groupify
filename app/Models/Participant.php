@@ -23,4 +23,15 @@ class Participant extends Model
     {
         return $this->belongsTo(Session::class, 'group_session_id');
     }
+
+    /** Broadcast presence auth needs an Authenticatable-shaped user (FR-3.5). */
+    public function getAuthIdentifier(): mixed
+    {
+        return $this->getKey();
+    }
+
+    public function getAuthIdentifierForBroadcasting(): mixed
+    {
+        return $this->getKey();
+    }
 }

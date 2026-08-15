@@ -18,6 +18,10 @@ use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SessionPageController;
 use Illuminate\Support\Facades\Route;
 
+// FR-3.5: presence-channel auth resolves the participant from the device token.
+// Registered directly (Broadcast::routes() drops group middleware in this
+// framework version); CSRF is skipped like the stock broadcast routes.
+
 Route::inertia('/', 'welcome')->name('home');
 
 // Heartbeat for the server-status UX (FR-8.2, AD-11) — controller-based so route caching works in prod
