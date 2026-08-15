@@ -54,10 +54,13 @@ export default function Join({ session }: { session: { code: string; status: str
     return (
         <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-100">
             <div className="w-full max-w-md">
-                <h1 className="text-4xl font-extrabold tracking-tight">Groupify</h1>
-                <p className="mt-2 text-slate-400">
-                    Join session <span className="font-mono font-bold text-cyan-400">{session.code}</span> — enter
-                    the PIN your host is showing.
+                <h1 className="text-2xl font-extrabold tracking-tight">
+                    <span className="text-slate-500">Join session</span>{' '}
+                    <span className="font-mono text-cyan-400">{session.code}</span>
+                </h1>
+                <p className="mt-2 text-slate-300">
+                    This is your session's <span className="text-slate-100">6-digit code</span>. Now enter the
+                    <span className="text-slate-100"> 4-digit PIN</span> your host is showing.
                 </p>
 
                 <div className="mt-8 space-y-4">
@@ -66,10 +69,10 @@ export default function Join({ session }: { session: { code: string; status: str
                             type="text"
                             inputMode="numeric"
                             autoFocus
-                            placeholder="PIN"
+                            placeholder="4-digit PIN"
                             value={data.pin}
-                            onChange={(e) => setData('pin', e.target.value)}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 font-mono text-2xl tracking-widest outline-none focus:border-cyan-400"
+                            onChange={(e) => setData('pin', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 font-mono text-2xl tracking-[0.5em] outline-none placeholder:font-sans placeholder:text-sm placeholder:tracking-normal placeholder:text-slate-500 focus:border-cyan-400"
                         />
                         {errors.pin && <p className="mt-1 text-sm text-rose-400">{errors.pin}</p>}
                     </div>
@@ -98,8 +101,8 @@ export default function Join({ session }: { session: { code: string; status: str
                 <button
                     type="button"
                     onClick={submit}
-                    disabled={processing}
-                    className="mt-6 w-full rounded-2xl bg-emerald-400 py-3 font-bold text-emerald-950 transition active:scale-[0.98] disabled:opacity-60"
+                    disabled={processing || !data.pin || !data.name.trim()}
+                    className="mt-6 w-full rounded-2xl bg-emerald-400 py-3 font-bold text-emerald-950 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     {processing ? 'Joining…' : 'Enter the room'}
                 </button>

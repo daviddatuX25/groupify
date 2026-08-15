@@ -46,6 +46,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     const [modQueue, setModQueue] = useState<{ id: number; scope: string; author: string; body: string }[]>([]);
     const [templates, setTemplates] = useState<{ id: number; name: string }[]>([]);
     const [liveCount, setLiveCount] = useState<number | null>(null);
+    const [joinBase, setJoinBase] = useState('');
 
     // Persist the admin token from the server prop (AD-3); subsequent loads read it.
     if (typeof window !== 'undefined' && session.admin_token) {
@@ -94,7 +95,8 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
     // info destroyed the canvas and the effect never re-ran).
     const qrRef = (node: HTMLCanvasElement | null) => {
         if (node && data.code) {
-            void QRCode.toCanvas(node, `${window.location.origin}/join/${data.code}`, {
+            const base = joinBase || window.location.origin;
+            void QRCode.toCanvas(node, `${base}/join/${data.code}`, {
                 width: 160,
                 margin: 1,
                 color: { dark: '#0e1511', light: '#ffffff' },
@@ -219,16 +221,27 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
                             {(liveCount ?? data.presence)} online
                         </span>
-                        <span className="font-mono text-rose-400">PIN: {session.pin}</span>
+                        <span className="font-mono text-cyan-300">PIN: {session.pin}</span>
                     </div>
                 </header>
 
                 {showJoinInfo && (
                 <section className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-12">
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-900 p-5 md:col-span-3">
-                        <canvas ref={qrRef} className="h-36 w-36 rounded-lg bg-white p-2" />
+                        <canvas key={joinBase} ref={qrRef} className="h-36 w-36 rounded-lg bg-white p-2" />
                         <p className="mt-3 text-xs uppercase tracking-widest text-slate-400">Scan to join</p>
                         <p className="mt-1 font-mono text-lg font-bold tracking-widest text-cyan-400">{data.code}</p>
+                        <input
+                            type="text"
+                            value={joinBase}
+                            onChange={(e) => setJoinBase(e.target.value)}
+                            placeholder={typeof window !== 'undefined' ? window.location.origin : ''}
+                            className="mt-3 w-full rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-center font-mono text-xs text-slate-300 outline-none focus:border-cyan-400"
+                            title="Join URL for phones on your network (localhost means the phone itself — use your computer's LAN IP)"
+                        />
+                        <p className="mt-1 text-center text-[10px] text-slate-600">
+                            If phones can't scan: replace localhost with this computer's LAN IP (e.g. 192.168.1.20:8081)
+                        </p>
                     </div>
 
                     <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-900 p-5 md:col-span-9">
@@ -240,7 +253,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                                     placeholder="Auto-dissolve (min)"
                                     value={timerMin}
                                     onChange={(e) => setTimerMin(e.target.value)}
-                                    className="w-36 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                                    className="w-44 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-cyan-400"
                                 />
                                 <input
                                     type="text"
@@ -316,7 +329,7 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                         </div>
                         <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/10 pt-4 sm:grid-cols-4">
                             {[
-                                ['PIN', session.pin, 'text-rose-400'],
+                                ['PIN', session.pin, 'text-cyan-300'],
                                 ['Topics set', `${topicsSet}/${data.groups.length}`, 'text-cyan-400'],
                                 ['In pool', `${data.pool.length}`, 'text-slate-100'],
                                 ['Groups', `${data.groups.length}`, 'text-slate-100'],
@@ -470,7 +483,12 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                             </select>
                         </span>
                     ))}
-                    {data.pool.length === 0 && <p className="text-sm text-slate-500">Everyone is grouped.</p>}
+                    {data.pool.length === 0 &&
+                        (data.groups.length > 0 ? (
+                            <p className="text-sm text-slate-500">Everyone is grouped.</p>
+                        ) : (
+                            <p className="text-sm text-slate-500">The pool is empty — no participants yet.</p>
+                        ))}
                 </div>
 
                 {/* Pending requests across groups (phase-2 A completion) */}
@@ -621,9 +639,10 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                                             onChange={(e) =>
                                                 setQuizDraft((d) => d.map((x, i) => (i === qi ? { ...x, points: Number(e.target.value) } : x)))
                                             }
-                                            className="w-16 rounded-lg border border-white/10 bg-slate-900 px-2 py-1 text-sm outline-none focus:border-cyan-400"
-                                            title="points"
+                                            className="w-20 rounded-lg border border-white/10 bg-slate-900 px-2 py-1 text-sm outline-none focus:border-cyan-400"
+                                            aria-label="points"
                                         />
+                                        <span className="text-xs text-slate-500">pts</span>
                                         <button
                                             type="button"
                                             onClick={() => setQuizDraft((d) => d.filter((_, i) => i !== qi))}
@@ -634,12 +653,15 @@ export default function Show({ session }: { session: Board & { id: number; pin: 
                                     </div>
                                     {qq.options.map((opt, oi) => (
                                         <div key={oi} className="mt-1 flex items-center gap-2">
-                                            <input
-                                                type="radio"
-                                                name={`correct-${qi}`}
-                                                checked={qq.answer === oi}
-                                                onChange={() => setQuizDraft((d) => d.map((x, i) => (i === qi ? { ...x, answer: oi } : x)))}
-                                                className="accent-emerald-400"
+                                            <button
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={qq.answer === oi}
+                                                aria-label={`correct answer ${oi + 1}`}
+                                                onClick={() => setQuizDraft((d) => d.map((x, i) => (i === qi ? { ...x, answer: oi } : x)))}
+                                                className={`h-4 w-4 shrink-0 rounded-full border-2 ${
+                                                    qq.answer === oi ? 'border-emerald-400 bg-emerald-400' : 'border-slate-600 bg-transparent'
+                                                }`}
                                             />
                                             <input
                                                 value={opt}
