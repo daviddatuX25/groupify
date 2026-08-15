@@ -14,6 +14,7 @@ use App\Support\GroupNamer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -206,6 +207,8 @@ class AdminActionsController
             Participant::query()->create([
                 'group_session_id' => $session->id,
                 'name' => $name,
+                'avatar_style' => 'initials',
+                'avatar_seed' => Str::random(16),
                 'token' => null,
             ]);
             $taken[] = $key;

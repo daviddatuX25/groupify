@@ -11,6 +11,7 @@ use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -27,6 +28,8 @@ class JoinController
                 'code' => $session->code,
                 'status' => $session->status,
                 'pin_required' => ! $pinless,
+                'ends_at' => $session->ends_at?->toIso8601String(),
+                'purge_at' => $session->purge_at?->toIso8601String(),
             ],
         ]);
     }
@@ -165,6 +168,8 @@ class JoinController
                 [
                     'name' => $name,
                     'display_name' => $anonymous ? RandomName::generate() : null,
+                    'avatar_style' => 'initials',
+                    'avatar_seed' => Str::random(16),
                     'email' => $data['email'] ?? null,
                 ],
             );

@@ -38,7 +38,7 @@ class SessionSnapshot
             ->where('group_session_id', $session->id)
             ->whereNotIn('id', $activeMemberIds)
             ->orderBy('name')
-            ->get(['id', 'name', 'display_name', 'custom_role']);
+            ->get(['id', 'name', 'display_name', 'custom_role', 'avatar_style', 'avatar_seed']);
 
         $quiz = null;
         $run = QuizRun::query()->where('group_session_id', $session->id)->latest('id')->first();
@@ -86,12 +86,17 @@ class SessionSnapshot
             'code' => $session->code,
             'status' => $session->status,
             'dissolve_at' => $session->dissolve_at !== null ? Carbon::parse($session->dissolve_at)->toIso8601String() : null,
+            'expires_at' => ($session->purge_at ?? $session->ends_at)?->toIso8601String(),
             'config' => $admin ? $session->config->toArray() : $session->config->publicView(),
             'presence' => Participant::query()->where('group_session_id', $session->id)->count(),
             'pool' => $pool->map(fn ($p) => [
                 'id' => $p->id,
                 'name' => $p->display_name ?? $p->name,
                 'custom_role' => $p->custom_role,
+                'avatar' => [
+                    'style' => $p->avatar_style ?? 'initials',
+                    'seed' => $p->avatar_seed ?? 'participant-'.$p->id,
+                ],
             ])->values(),
             'groups' => $groups->map(fn (Group $group) => [
                 'id' => $group->id,
@@ -106,13 +111,17 @@ class SessionSnapshot
                     ->where('status', 'active')
                     ->get()
                     ->map(function (Membership $m) use ($anonymous, $admin): array {
-                        /** @var array{id: int, name: string, real_name: string|null, role: string, custom_role: string|null} $member */
+                        /** @var array{id: int, name: string, real_name: string|null, role: string, custom_role: string|null, avatar: array{style: string, seed: string}} $member */
                         $member = [
                             'id' => $m->participant_id,
                             'name' => $m->participant->display_name ?? $m->participant->name,
                             'real_name' => $anonymous && $admin ? $m->participant->name : null,
                             'role' => $m->role,
                             'custom_role' => $m->participant->custom_role,
+                            'avatar' => [
+                                'style' => $m->participant->avatar_style ?? 'initials',
+                                'seed' => $m->participant->avatar_seed ?? 'participant-'.$m->participant_id,
+                            ],
                         ];
 
                         return $member;
@@ -128,6 +137,10 @@ class SessionSnapshot
                             'id' => $m->participant_id,
                             'name' => $m->participant->display_name ?? $m->participant->name,
                             'real_name' => $admin ? $m->participant->name : null,
+                            'avatar' => [
+                                'style' => $m->participant->avatar_style ?? 'initials',
+                                'seed' => $m->participant->avatar_seed ?? 'participant-'.$m->participant_id,
+                            ],
                         ];
                     })
                     ->values()
@@ -138,6 +151,10 @@ class SessionSnapshot
                 'name' => $me->display_name ?? $me->name,
                 'real_name' => $anonymous ? $me->name : null,
                 'pooled' => ! $activeMemberIds->contains($me->id),
+                'avatar' => [
+                    'style' => $me->avatar_style ?? 'initials',
+                    'seed' => $me->avatar_seed ?? 'participant-'.$me->id,
+                ],
             ],
         ];
     }

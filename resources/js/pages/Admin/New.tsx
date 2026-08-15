@@ -1,6 +1,8 @@
 import { Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState  } from 'react';
+import type {FormEvent} from 'react';
 import { Logo } from '@/components/Logo';
+import { saveSession } from '@/lib/savedSessions';
 
 type JoinMode = 'open' | 'approval';
 type EndMode = '1h' | '12h' | '1d' | '1w' | '1m' | 'manual' | 'custom';
@@ -20,6 +22,7 @@ type ChoiceCardProps = {
     description?: string;
     meta?: string;
     compact?: boolean;
+    className?: string;
 };
 
 function ChoiceCard({
@@ -29,6 +32,7 @@ function ChoiceCard({
     description,
     meta,
     compact = false,
+    className = '',
 }: ChoiceCardProps) {
     return (
         <button
@@ -37,12 +41,12 @@ function ChoiceCard({
             aria-checked={checked}
             onClick={onChange}
             className={`relative flex w-full min-w-0 cursor-pointer items-start gap-3 rounded-2xl border text-left transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary ${
-                compact ? 'min-h-14 p-3' : 'p-4'
+                compact ? 'min-h-16 p-3.5' : 'p-4'
             } ${
                 checked
                     ? 'border-primary/70 bg-primary/10 shadow-[0_0_22px_rgba(78,222,163,0.12)]'
                     : 'border-white/10 bg-surface-container-lowest hover:border-white/25'
-            }`}
+            } ${className}`}
         >
             <span className="min-w-0 flex-1">
                 <span
@@ -119,6 +123,30 @@ export default function New() {
         errors.retention_days ??
         errors.end_mode ??
         errors.custom_ends_at;
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (step < setupSteps.length - 1) {
+            setStep((current) => Math.min(setupSteps.length - 1, current + 1));
+
+            return;
+        }
+
+        post('/sessions', {
+            onSuccess: (page) => {
+                const created = page.props.session as
+                    | {
+                          code?: string;
+                          expires_at?: string | null;
+                      }
+                    | undefined;
+
+                if (created?.code) {
+                    saveSession(created.code, 'live', created.expires_at);
+                }
+            },
+        });
+    };
 
     return (
         <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-surface px-4 py-6 font-sans text-on-surface antialiased sm:px-6 sm:py-10">
@@ -187,13 +215,7 @@ export default function New() {
                     ))}
                 </nav>
 
-                <form
-                    className="mt-6"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        post('/sessions');
-                    }}
-                >
+                <form className="mt-6" onSubmit={handleSubmit}>
                     {step === 0 && (
                         <section aria-labelledby="setup-access-title">
                             <p className="font-mono text-[10px] font-bold tracking-widest text-secondary uppercase">
@@ -279,7 +301,7 @@ export default function New() {
                                 Choose a preset or set your own closing time.
                             </p>
                             <div
-                                className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3"
+                                className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-6"
                                 role="radiogroup"
                                 aria-label="Room duration"
                             >
@@ -292,6 +314,7 @@ export default function New() {
                                         }
                                         title={choice.title}
                                         compact={true}
+                                        className="sm:col-span-2"
                                     />
                                 ))}
                                 <ChoiceCard
@@ -301,6 +324,7 @@ export default function New() {
                                     }
                                     title="Choose a date"
                                     compact={true}
+                                    className="sm:col-span-2 sm:col-start-3"
                                 />
                             </div>
                             {data.end_mode === 'custom' && (
@@ -321,7 +345,7 @@ export default function New() {
                                                 event.target.value,
                                             )
                                         }
-                                        className="mt-2 w-full rounded-lg border border-white/10 bg-surface-container px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
+                                        className="kinetic-input mt-2 w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
                                     />
                                     {errors.custom_ends_at && (
                                         <p className="mt-2 text-xs text-error">
@@ -370,7 +394,7 @@ export default function New() {
                                                 : Number(event.target.value),
                                         )
                                     }
-                                    className="w-full rounded-xl border border-white/10 bg-surface-container px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
+                                    className="kinetic-input w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
                                 >
                                     <option value="1">
                                         Delete after 1 day

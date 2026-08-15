@@ -45,6 +45,31 @@ test('participant can save and remove a room from the homepage', async ({
     await expect(page.getByText(code, { exact: true })).toHaveCount(0);
 });
 
+test('creating a room saves it on the host browser', async ({ page }) => {
+    await page.goto('/new');
+    await page.evaluate(() => localStorage.clear());
+
+    await page
+        .getByRole('button', { name: /go to duration step/i })
+        .click();
+    await expect(
+        page.getByRole('heading', { name: /how long should it stay open/i }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: /go to finish step/i }).click();
+    await expect(
+        page.getByRole('heading', { name: 'Keep the results' }),
+    ).toBeVisible();
+    const adminNavigation = page.waitForURL(/\/admin\/sessions\/\d+/);
+    await page.getByRole('button', { name: /create room/i }).click();
+    await adminNavigation;
+
+    const code = (await page.locator('body').innerText()).match(/\b\d{6}\b/)?.[0] ?? '';
+    expect(code).toMatch(/^\d{6}$/);
+
+    await page.goto('/');
+    await expect(page.getByText(code, { exact: true })).toBeVisible();
+});
+
 test('homepage opens the QR scanner affordance', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: /scan qr code/i }).click();

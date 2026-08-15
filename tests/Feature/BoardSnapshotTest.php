@@ -15,8 +15,16 @@ beforeEach(function () {
 });
 
 it('lists pooled participants and group cards in the session snapshot', function () {
-    $pooled = Participant::factory()->count(2)->create(['group_session_id' => $this->session->id]);
-    $member = Participant::factory()->create(['group_session_id' => $this->session->id]);
+    $pooled = Participant::factory()->count(2)->sequence(
+        ['name' => 'Amy', 'avatar_style' => 'lorelei', 'avatar_seed' => 'amy-seed'],
+        ['name' => 'Bea', 'avatar_style' => 'adventurer', 'avatar_seed' => 'bea-seed'],
+    )->create(['group_session_id' => $this->session->id]);
+    $member = Participant::factory()->create([
+        'group_session_id' => $this->session->id,
+        'name' => 'Carl',
+        'avatar_style' => 'bottts-neutral',
+        'avatar_seed' => 'carl-seed',
+    ]);
     $group = Group::factory()->create(['group_session_id' => $this->session->id, 'name' => 'Team Alpha']);
     $group->memberships()->create(['participant_id' => $member->id, 'role' => 'leader']);
 
@@ -25,10 +33,13 @@ it('lists pooled participants and group cards in the session snapshot', function
         ->assertInertia(fn ($page) => $page
             ->component('Session/Show')
             ->has('session.pool', 2)
+            ->where('session.pool.0.avatar.style', 'lorelei')
+            ->where('session.pool.0.avatar.seed', 'amy-seed')
             ->has('session.groups', 1)
             ->where('session.groups.0.name', 'Team Alpha')
             ->where('session.groups.0.member_count', 1)
             ->where('session.groups.0.capacity', 6)
+            ->where('session.groups.0.members.0.avatar.style', 'bottts-neutral')
             ->where('session.presence', 3));
 });
 

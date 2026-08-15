@@ -13,6 +13,7 @@ use App\Http\Controllers\GroupController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\JoinController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\ParticipantProfileController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SessionPageController;
@@ -35,6 +36,7 @@ Route::post('/sessions', [SessionController::class, 'store'])->name('sessions.st
 Route::get('/join/{session:code}/seat', [JoinController::class, 'seat'])->name('join.seat');
 Route::get('/join/{session:code}', [JoinController::class, 'show'])->name('join.show');
 Route::post('/join/{session:code}', [JoinController::class, 'store'])->name('join.store');
+Route::patch('/s/{session:code}/profile', [ParticipantProfileController::class, 'update'])->name('profile.update');
 Route::get('/s/{session:code}', [SessionPageController::class, 'show'])->name('session.show');
 
 // JSON board snapshot for realtime client updates (AD-6)
