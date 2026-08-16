@@ -37,24 +37,26 @@ Verified: `config-editor.spec.ts` "clearing the quiz points field…".
 
 ## Open
 
-### 4. Moderation queue never refreshes on its own
-Pending posts broadcast nothing and the admin panel has **no mount/connect
-refetch** — the queue (and chat monitor, activity feed, template list) stays
-empty on a fresh load until an unrelated channel event or mutation fires.
-Admin must create a group / toggle a plugin / wait for a join to see pending
-messages. Tests work around it (`openModerationQueue` triggers a refetch);
-fix is a pending-message broadcast or a mount refetch.
+### 4. Moderation queue never refreshes on its own — FIXED
+Root cause was two-fold: pending posts broadcast nothing, and the admin had
+no mount refetch. Fixed by broadcasting `MessageCreated` for pending posts,
+adding a mount refetch for the admin-only panels, and a 5s resilience poll so
+a dropped WS event can never leave the admin stale. The deeper root cause was
+the service worker: `/admin/sessions/*` GETs fell into its cache-first branch
+and served one-request-stale responses — the SW is now network-first for all
+dynamic endpoints (v2). Tests assert the realtime queue appearance with no
+user action.
 
-### 5. Reject leaves the moderation queue stuck at (1)
-`AdminMessageController::decide` deletes the message, but the admin UI's
-refetch can read a stale pending list — the queue header stays at (1) after
-reject (approve clears only because its `MessageCreated` broadcast triggers a
-second refetch). `messaging.spec.ts` asserts the server truth instead.
+### 5. Reject leaves the moderation queue stuck at (1) — FIXED
+Same service-worker staleness as #4: the decide handler's refetch read the
+previous cached pending list. With the SW network-first fix the refetch reads
+fresh; reject also broadcasts so the queue header clears immediately. The
+test asserts the queue disappears after reject.
 
-### 6. Banned participants stay visible in the pool
-`SessionSnapshot` pool query has no `banned_at` filter — a banned participant
-is removed from groups but still shows as a pool chip (no actions work).
-Fix: exclude `banned_at` participants from the pool query.
+### 6. Banned participants stay visible in the pool — FIXED
+`SessionSnapshot` pool query (and the seat/presence count) now excludes
+`banned_at` participants. The ban test asserts the participant vanishes from
+both the group and the pool.
 
 ### 7. Profile customization is unwired — FIXED
 `AvatarProfileDialog` existed but no page rendered it and no UI called
@@ -68,11 +70,10 @@ flow cover it.
 `POST /admin/sessions/{id}/groups/{g}/leader` has a controller but no UI
 caller. `leader-flow.spec.ts` pins the API contract.
 
-### 9. Export button 404s
-The admin header's Export `<a href>` sends no `X-Admin-Token` and no
-`?token=` — `AuthorizesAdminToken` requires one, so the click 404s.
-`admin-tools.spec.ts` tests the endpoint via API; fix the link to carry the
-token (query param or cookie).
+### 9. Export button 404s — FIXED
+The Export control is now a button that downloads via an authenticated
+fetch → blob (`X-Admin-Token` header; no bearer token in the URL). The test
+clicks the UI button and asserts the CSV download.
 
 ## Infra note
 

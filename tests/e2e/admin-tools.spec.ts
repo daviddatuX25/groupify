@@ -4,9 +4,8 @@ import { createSession } from './fixtures/session';
 import { joinViaApi, newDeviceToken } from './fixtures/participant';
 
 /**
- * Admin tooling: CSV export (API contract), activity feed, and session
- * destroy. KNOWN BUG: the Export UI link carries no admin token, so the
- * header-less click 404s — the export endpoint is tested via its API.
+ * Admin tooling: CSV export (API contract + UI download button), activity
+ * feed, and session destroy.
  */
 
 test('CSV export contains participants and their groups', async ({ page }) => {
@@ -39,6 +38,19 @@ test('CSV export contains participants and their groups', async ({ page }) => {
     const csv = await res.text();
     expect(csv).toContain('Maya');
     expect(csv).toContain('Team Alpha');
+});
+
+test('the Export button downloads a CSV', async ({ page }) => {
+    const s = await createSession(page);
+    const token = newDeviceToken();
+    await joinViaApi(page, s, 'Maya', token);
+
+    // The button authenticates via header + blob (found-bugs #9 fix).
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+    await page.getByRole('button', { name: /export/i }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.csv$/);
+    expect(download.suggestedFilename()).toContain(s.code);
 });
 
 test('activity feed records session events', async ({ page }) => {

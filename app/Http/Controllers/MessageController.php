@@ -122,9 +122,11 @@ class MessageController
             'body' => $data['body'],
         ]);
 
-        if ($status === 'visible') {
-            broadcast(new MessageCreated($session, $message->scope, $message->group_id))->toOthers();
-        }
+        // Broadcast for visible AND pending: the admin's moderation queue is
+        // event-driven — a pending post must trigger its refetch, or the
+        // queue stays invisible until an unrelated event (found-bugs #4).
+        // Participants refetch too but only ever receive visible messages.
+        broadcast(new MessageCreated($session, $message->scope, $message->group_id))->toOthers();
         $recorder->record($session, $data['scope'].'_message', ['group_id' => $data['group_id'] ?? null]);
 
         return response()->json(['ok' => true, 'message_id' => $message->id]);

@@ -31,30 +31,6 @@ async function expectVisibleWithFallback(
     }
 }
 
-/**
- * KNOWN GAP: the moderation queue only refreshes on a channel event (pending
- * posts broadcast nothing; the admin has no mount/connect refetch). Creating
- * a group fires GroupCreated → refetch. Under heavy parallel load the refetch
- * chain can outrun the timeout, so retry the trigger up to three times.
- */
-async function openModerationQueue(page: Page): Promise<void> {
-    for (let attempt = 0; attempt < 3; attempt++) {
-        await page.getByRole('button', { name: /live grid/i }).click();
-        await page.getByRole('button', { name: /\+ create group/i }).click();
-        await page.getByRole('button', { name: 'Add empty group' }).click();
-        await expect(
-            page.getByRole('heading', { name: 'Team Alpha' }),
-        ).toBeVisible();
-        await page.getByRole('button', { name: /plugins/i }).click();
-
-        if (await page.getByText(/Moderation Queue \(\d+\)/).count()) {
-            return;
-        }
-    }
-
-    throw new Error('Moderation queue never appeared after refetch triggers');
-}
-
 test('room message from a participant reaches the admin chat monitor', async ({
     page,
     browser,
@@ -142,26 +118,13 @@ test('moderated posts queue and publish only on approval', async ({
     // The post is held: it must NOT appear in the room chat yet.
     await expect(participant.getByText('Can anyone help?')).toHaveCount(0);
 
-    // KNOWN GAP: pending posts broadcast nothing and the admin has no
-    // mount/connect refetch — the queue only refreshes on a channel event
-    // (or mutation). Wait for the post to commit, then create a group
-    // (GroupCreated → refetch) — the admin's only way to see the queue today.
-    await expect
-        .poll(
-            async () => {
-                const res = await page.request.get(
-                    `/admin/sessions/${s.sessionId}/messages/pending`,
-                    { headers: { 'X-Admin-Token': s.adminToken } },
-                );
-
-                return (await res.json()).messages.length;
-            },
-            { timeout: 10000 },
-        )
-        .toBe(1);
-
-    await openModerationQueue(page);
-    await expect(page.getByText('Moderation Queue (1)')).toBeVisible();
+    // The pending post broadcasts MessageCreated — the admin's event-driven
+    // refetch (plus the 5s resilience poll) picks it up; the queue renders
+    // on the Plugins tab.
+    await page.getByRole('button', { name: /plugins/i }).click();
+    await expect(page.getByText('Moderation Queue (1)')).toBeVisible({
+        timeout: 10000,
+    });
     await expect(page.getByText('Can anyone help?')).toBeVisible();
 
     // Approval publishes it to the room + chat monitor.
@@ -199,29 +162,17 @@ test('a rejected moderated post never reaches the room', async ({
         .fill('Spam message');
     await participant.getByRole('button', { name: 'Send room message' }).click();
 
-    // Same known gap: wait for the commit, then refresh via a channel event.
-    await expect
-        .poll(
-            async () => {
-                const res = await page.request.get(
-                    `/admin/sessions/${s.sessionId}/messages/pending`,
-                    { headers: { 'X-Admin-Token': s.adminToken } },
-                );
-
-                return (await res.json()).messages.length;
-            },
-            { timeout: 10000 },
-        )
-        .toBe(1);
-
-    await openModerationQueue(page);
-    await expect(page.getByText('Moderation Queue (1)')).toBeVisible();
+    // The queue appears via the realtime broadcast (+ resilience poll).
+    await page.getByRole('button', { name: /plugins/i }).click();
+    await expect(page.getByText('Moderation Queue (1)')).toBeVisible({
+        timeout: 10000,
+    });
     await page.getByRole('button', { name: 'Reject', exact: true }).click();
 
-    // KNOWN BUG: the queue header may stay stuck at (1) after reject — the
-    // decide's refetch can read a stale pending list (approve clears only
-    // because its broadcast triggers a second refetch). Assert the server
-    // truth instead: the message is deleted and never published.
+    // Reject deletes + broadcasts, so the queue clears (found-bugs #5 fix).
+    await expect(page.getByText('Moderation Queue (1)')).toHaveCount(0, {
+        timeout: 5000,
+    });
     await expect
         .poll(
             async () => {

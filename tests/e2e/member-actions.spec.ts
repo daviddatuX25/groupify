@@ -157,22 +157,27 @@ test('ban removes the participant and blocks rejoin by name', async ({
         .getByRole('button', { name: 'Ban participants', exact: true })
         .click();
 
-    // Removed from every group. (KNOWN BUG: the pool query doesn't filter
-    // banned_at, so she stays visible in the admin pool — asserted by its
-    // absence being intentionally NOT checked here.)
+    // Removed from groups AND the pool (banned_at filter — found-bugs #6).
     await expect
         .poll(
             async () => {
                 const b = await fetchBoard(page, s.code, token);
-
-                return b.groups.some(
+                const inGroup = b.groups.some(
                     (g: { members: { name: string }[] }) =>
                         g.members.some((m) => m.name === 'Maya'),
                 );
+                const inPool = b.pool.some(
+                    (m: { name: string }) => m.name === 'Maya',
+                );
+
+                return { inGroup, inPool };
             },
             { timeout: 5000 },
         )
-        .toBe(false);
+        .toEqual({ inGroup: false, inPool: false });
+    await expect(page.getByText(/unassigned pool \(0\)/i)).toBeVisible({
+        timeout: 5000,
+    });
 
     // Rejoin with the same name is blocked.
     const rejoiner = await browser.newPage();

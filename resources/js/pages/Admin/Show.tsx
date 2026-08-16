@@ -169,8 +169,7 @@ export default function Show({
     const [actionError, setActionError] = useState<string | null>(null);
 
     const refetch = () => {
-        fetch(`/api/sessions/${data.code}/board`, {
-            headers: { 'X-Admin-Token': adminToken },
+        fetch(`/api/sessions/${data.code}/board`, {            headers: { 'X-Admin-Token': adminToken },
         })
             .then((r) => (r.ok ? r.json() : null))
             .then((json) => {
@@ -220,6 +219,71 @@ export default function Show({
             })
             .catch(() => {});
     };
+
+    // Fresh loads must populate the admin-only panels (moderation queue,
+    // chat monitor, activity, templates) — the server props only carry the
+    // board snapshot (found-bugs #4).
+    useEffect(() => {
+        refetch();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Resilience: a dropped WS event (network hiccup, Reverb restart) must
+    // not leave the admin stale. A light poll keeps the queue/board/activity
+    // fresh alongside the event-driven refetches.
+    useEffect(() => {
+        const timer = window.setInterval(() => refetch(), 5000);
+        return () => window.clearInterval(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Export downloads via an authenticated fetch → blob: the plain <a>
+    // couldn't send X-Admin-Token and 404'd (found-bugs #9); a token query
+    // param would leak the bearer into history.
+    const downloadExport = async () => {
+        const xsrf = document.cookie
+            .split('; ')
+            .find((c) => c.startsWith('XSRF-TOKEN='))
+            ?.split('=')[1];
+        try {
+            const res = await fetch(
+                `/admin/sessions/${session.id}/export`,
+                {
+                    headers: {
+                        Accept: 'text/csv',
+                        'X-Admin-Token': adminToken,
+                        ...(xsrf
+                            ? {
+                                  'X-XSRF-TOKEN': decodeURIComponent(xsrf),
+                              }
+                            : {}),
+                    },
+                },
+            );
+
+            if (!res.ok) {
+                toast.error('Export failed — try again.');
+                sound.play(SOUNDS.CAUTION);
+
+                return;
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `groupify-${data.code}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            sound.play(SOUNDS.BUTTON);
+        } catch {
+            toast.error('Export failed — try again.');
+            sound.play(SOUNDS.CAUTION);
+        }
+    };
+
     const managedParticipants = [
         ...data.pool.map((participant) => ({
             id: participant.id,
@@ -985,15 +1049,16 @@ export default function Show({
                                         >
                                             Dissolve all
                                         </button>
-                                        <a
-                                            href={`/admin/sessions/${session.id}/export`}
+                                        <button
+                                            type="button"
+                                            onClick={() => void downloadExport()}
                                             className="inline-flex items-center gap-1.5 rounded-xl border border-secondary/40 bg-secondary/10 px-4 py-2 font-mono text-xs font-bold tracking-wider text-secondary uppercase transition-all hover:bg-secondary/20 active:scale-95"
                                         >
                                             <span className="material-symbols-outlined text-[15px]">
                                                 download
                                             </span>
                                             <span>Export</span>
-                                        </a>
+                                        </button>
                                         <SoundToggle />
                                     </div>
                                 </div>

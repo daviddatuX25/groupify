@@ -81,6 +81,10 @@ class AdminMessageController
             broadcast(new MessageCreated($session, $message->scope, $message->group_id))->toOthers();
         } else {
             $message->delete();
+            // Also broadcast on reject: the decide handler's own refetch can
+            // read a stale pending list (found-bugs #5); this second event
+            // forces a fresh read so the queue header clears.
+            broadcast(new MessageCreated($session, $message->scope, $message->group_id))->toOthers();
         }
 
         return response()->json(['ok' => true]);

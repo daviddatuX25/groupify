@@ -37,6 +37,7 @@ class SessionSnapshot
         $pool = Participant::query()
             ->where('group_session_id', $session->id)
             ->whereNotIn('id', $activeMemberIds)
+            ->whereNull('banned_at') // banned participants must vanish (found-bugs #6)
             ->orderBy('name')
             ->get(['id', 'name', 'display_name', 'custom_role', 'avatar_style', 'avatar_seed']);
 
@@ -88,7 +89,10 @@ class SessionSnapshot
             'dissolve_at' => $session->dissolve_at !== null ? Carbon::parse($session->dissolve_at)->toIso8601String() : null,
             'expires_at' => ($session->purge_at ?? $session->ends_at)?->toIso8601String(),
             'config' => $admin ? $session->config->toArray() : $session->config->publicView(),
-            'presence' => Participant::query()->where('group_session_id', $session->id)->count(),
+            'presence' => Participant::query()
+                ->where('group_session_id', $session->id)
+                ->whereNull('banned_at')
+                ->count(),
             'pool' => $pool->map(fn ($p) => [
                 'id' => $p->id,
                 'name' => $p->display_name ?? $p->name,

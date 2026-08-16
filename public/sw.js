@@ -1,10 +1,15 @@
 /* Groupify service worker (CAP-12): offline app shell + resilient API reads.
- * Network-first for API GETs (snapshot freshness wins; cache is the offline
- * fallback); cache-first for static assets. Versioned precache.
+ * Network-first for every dynamic same-origin GET (pages, API, admin
+ * endpoints) — cache is the offline fallback, never the primary source.
+ * Cache-first only for the precached app shell. Versioned precache.
+ *
+ * History: v1 matched only /api/sessions/ as "API"; every other dynamic
+ * endpoint (admin panel, moderation queue, board APIs) fell into the
+ * cache-first branch and silently served one-request-stale responses —
+ * the moderation queue never refreshed and reject read stale pending lists.
  */
-const VERSION = 'groupify-v1';
+const VERSION = 'groupify-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
-const API = /\/api\/sessions\/|\.json$/;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -28,33 +33,26 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // API + Inertia JSON: network-first, cache as offline fallback.
-  if (API.test(url.pathname)) {
+  // Precached app shell: cache-first (offline entry point).
+  if (SHELL.includes(url.pathname)) {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(VERSION).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request)),
+      caches.match(request).then((cached) => cached || fetch(request)),
     );
     return;
   }
 
-  // Static assets: cache-first with network fill.
+  // Pages + API: network-first, cache as the offline fallback. The cache
+  // is updated in the background so a dropped connection still serves the
+  // last good state.
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(VERSION).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    }),
+    fetch(request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(VERSION).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request)),
   );
 });
