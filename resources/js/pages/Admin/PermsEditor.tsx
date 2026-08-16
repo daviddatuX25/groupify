@@ -276,7 +276,7 @@ onSaved();
                 roles={Object.keys(roles)}
                 initialValue={assignmentParticipant.custom_role ?? ''}
                 onClose={() => setAssignmentParticipant(null)}
-                onConfirm={(role) => {
+                onConfirm={(_action, role) => {
                     assignRole(assignmentParticipant.id, role);
                     setAssignmentParticipant(null);
                 }}

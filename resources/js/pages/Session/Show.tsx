@@ -1,11 +1,16 @@
 import { echo, useConnectionStatus } from '@laravel/echo-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import ComingNext from '@/components/ComingNext';
+import AvatarProfileDialog from '@/components/AvatarProfileDialog';
 import GroupCreateDialog from '@/components/GroupCreateDialog';
 import { Logo } from '@/components/Logo';
 import ParticipantAvatar from '@/components/ParticipantAvatar';
 import ServerStatus from '@/components/ServerStatus';
+import SoundToggle from '@/components/SoundToggle';
 import { configureGroupifyEcho } from '@/lib/echo';
+import { normalizeAvatarStyle } from '@/lib/avatars';
+import { SOUNDS, sound } from '@/lib/sound';
 import {
     isSessionSaved,
     removeSavedSession,
@@ -95,6 +100,8 @@ export default function Show({ session }: { session: SessionProps }) {
         }[]
     >([]);
     const [chatOpen, setChatOpen] = useState(false);
+    const [profileOpen, setProfileOpen] = useState(false);
+    const [profileSaving, setProfileSaving] = useState(false);
     const [globalDraft, setGlobalDraft] = useState('');
     const [groupDraft, setGroupDraft] = useState('');
     const [detailGroupId, setDetailGroupId] = useState<number | null>(null);
@@ -113,6 +120,53 @@ export default function Show({ session }: { session: SessionProps }) {
             : (window.localStorage.getItem('groupify.device_token') ?? '');
 
     const data = board ?? session;
+
+    const saveProfile = (style: string, seed: string) => {
+        const xsrf = document.cookie
+            .split('; ')
+            .find((c) => c.startsWith('XSRF-TOKEN='))
+            ?.split('=')[1];
+        setProfileSaving(true);
+        void fetch(`/s/${data.code}/profile`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Device-Token': deviceToken,
+                ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : {}),
+            },
+            body: JSON.stringify({
+                avatar_style: style,
+                avatar_seed: seed,
+            }),
+        })
+            .then((r) => {
+                if (r.ok) {
+                    setProfileOpen(false);
+                    toast.success('Profile saved');
+                    sound.play(SOUNDS.BUTTON);
+                    refetch();
+                    return;
+                }
+                return r
+                    .json()
+                    .then((j) => {
+                        toast.error(
+                            j.message ?? 'Could not save the profile.',
+                        );
+                        sound.play(SOUNDS.CAUTION);
+                    })
+                    .catch(() => {
+                        toast.error('Could not save the profile.');
+                        sound.play(SOUNDS.CAUTION);
+                    });
+            })
+            .catch(() => {
+                toast.error('Network error — try again.');
+                sound.play(SOUNDS.CAUTION);
+            })
+            .finally(() => setProfileSaving(false));
+    };
 
     const toggleSavedRoom = () => {
         if (savedRoom) {
@@ -243,7 +297,12 @@ export default function Show({ session }: { session: SessionProps }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status]);
 
-    const mutate = (url: string, payload: Record<string, unknown> = {}) => {
+    const mutate = (
+        url: string,
+        payload: Record<string, unknown> = {},
+        successMessage?: string,
+        soundKey?: string,
+    ) => {
         const xsrf = document.cookie
             .split('; ')
             .find((c) => c.startsWith('XSRF-TOKEN='))
@@ -262,20 +321,36 @@ export default function Show({ session }: { session: SessionProps }) {
                 if (r.ok) {
                     setActionError(null);
                     refetch();
+                    if (successMessage) {
+                        toast.success(successMessage);
+                        sound.play(soundKey ?? SOUNDS.BUTTON);
+                    }
 
                     return;
                 }
 
                 return r
                     .json()
-                    .then((j) =>
-                        setActionError(j.message ?? 'Something went wrong.'),
-                    )
-                    .catch(() =>
-                        setActionError(`Request failed (${r.status}).`),
-                    );
+                    .then((j) => {
+                        const message =
+                            j.message ?? 'Something went wrong.';
+                        setActionError(message);
+                        toast.error(message);
+                        sound.play(SOUNDS.CAUTION);
+                    })
+                    .catch(() => {
+                        const message = `Request failed (${r.status}).`;
+                        setActionError(message);
+                        toast.error(message);
+                        sound.play(SOUNDS.CAUTION);
+                    });
             })
-            .catch(() => setActionError('Network error — try again.'));
+            .catch(() => {
+                const message = 'Network error — try again.';
+                setActionError(message);
+                toast.error(message);
+                sound.play(SOUNDS.CAUTION);
+            });
     };
 
     const groups = useMemo(() => {
@@ -369,10 +444,15 @@ export default function Show({ session }: { session: SessionProps }) {
     };
 
     const submitCreate = () => {
-        mutate(`/s/${data.code}/groups`, {
-            name: createName,
-            field_values: fieldValues,
-        });
+        mutate(
+            `/s/${data.code}/groups`,
+            {
+                name: createName,
+                field_values: fieldValues,
+            },
+            'Group created',
+            SOUNDS.CELEBRATION,
+        );
         closeCreate();
     };
 
@@ -496,6 +576,7 @@ export default function Show({ session }: { session: SessionProps }) {
                                 </span>
                                 {savedRoom ? 'Saved' : 'Save room'}
                             </button>
+                            <SoundToggle />
                         </div>
                     </div>
                 </header>
@@ -550,6 +631,16 @@ export default function Show({ session }: { session: SessionProps }) {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setProfileOpen(true)}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-surface-variant/40 px-3 py-2 font-sans text-xs font-semibold text-on-surface-variant transition-all hover:bg-surface-variant hover:text-on-surface"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">
+                                        palette
+                                    </span>
+                                    Customize
+                                </button>
                                 {canMutate && data.me.pooled && (
                                     <>
                                         {(data.config.plugins ?? []).includes(
@@ -560,6 +651,9 @@ export default function Show({ session }: { session: SessionProps }) {
                                                 onClick={() =>
                                                     mutate(
                                                         `/s/${data.code}/match-me`,
+                                                        {},
+                                                        'Matched into a group',
+                                                        SOUNDS.CELEBRATION,
                                                     )
                                                 }
                                                 className="flex items-center gap-1.5 rounded-xl bg-secondary px-4 py-2.5 font-display text-xs font-bold text-on-secondary shadow-[0_0_15px_rgba(76,215,246,0.3)] transition-all duration-200 hover:brightness-110 active:scale-95"
@@ -590,6 +684,8 @@ export default function Show({ session }: { session: SessionProps }) {
                                         onClick={() =>
                                             mutate(
                                                 `/s/${data.code}/groups/${meIn.id}/leave`,
+                                                {},
+                                                `Left ${meIn.name}`,
                                             )
                                         }
                                         className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-surface-variant/40 px-4 py-2 font-sans text-xs font-bold text-on-surface-variant transition-all hover:bg-surface-variant hover:text-on-surface"
@@ -953,6 +1049,8 @@ export default function Show({ session }: { session: SessionProps }) {
                                                                     onClick={() =>
                                                                         mutate(
                                                                             `/s/${data.code}/groups/${g.id}/requests/${p.id}/approve`,
+                                                                            {},
+                                                                            `Approved ${p.name}'s request`,
                                                                         )
                                                                     }
                                                                     className="rounded-lg bg-primary-container px-2 py-0.5 text-xs font-bold text-on-primary-container transition-all hover:brightness-110"
@@ -965,6 +1063,8 @@ export default function Show({ session }: { session: SessionProps }) {
                                                                     onClick={() =>
                                                                         mutate(
                                                                             `/s/${data.code}/groups/${g.id}/requests/${p.id}/reject`,
+                                                                            {},
+                                                                            `Rejected ${p.name}'s request`,
                                                                         )
                                                                     }
                                                                     className="rounded-lg bg-error-container/40 px-2 py-0.5 text-xs font-bold text-error transition-all hover:bg-error-container"
@@ -990,6 +1090,9 @@ export default function Show({ session }: { session: SessionProps }) {
                                                         name={m.name}
                                                         avatar={m.avatar}
                                                         size="sm"
+                                                        leader={
+                                                            m.role === 'leader'
+                                                        }
                                                     />
                                                     <span
                                                         className={
@@ -1017,6 +1120,8 @@ export default function Show({ session }: { session: SessionProps }) {
                                                             onClick={() =>
                                                                 mutate(
                                                                     `/s/${data.code}/groups/${g.id}/members/${m.id}/kick`,
+                                                                    {},
+                                                                    `Kicked ${m.name}`,
                                                                 )
                                                             }
                                                             className="rounded bg-error-container/30 px-1.5 py-0.5 font-mono text-[10px] text-error hover:bg-error-container/50"
@@ -1057,6 +1162,8 @@ export default function Show({ session }: { session: SessionProps }) {
                                             onClick={() =>
                                                 mutate(
                                                     `/s/${data.code}/groups/${g.id}/join`,
+                                                    {},
+                                                    `Joined ${g.name}`,
                                                 )
                                             }
                                             className="rounded-xl border border-white/15 bg-surface-bright px-4 py-1.5 font-mono text-xs font-bold tracking-wider text-primary uppercase shadow-[0_0_10px_rgba(109,252,87,0.15)] transition-all hover:bg-surface-variant active:scale-95"
@@ -1161,6 +1268,9 @@ export default function Show({ session }: { session: SessionProps }) {
                                                     name={member.name}
                                                     avatar={member.avatar}
                                                     size="sm"
+                                                    leader={
+                                                        member.role === 'leader'
+                                                    }
                                                 />
                                                 <span className="truncate">
                                                     {member.name}
@@ -1181,6 +1291,8 @@ export default function Show({ session }: { session: SessionProps }) {
                                                         onClick={() =>
                                                             mutate(
                                                                 `/s/${data.code}/groups/${detailGroup.id}/members/${member.id}/kick`,
+                                                                {},
+                                                                `Kicked ${member.name}`,
                                                             )
                                                         }
                                                         className="rounded-lg bg-error-container/30 px-2 py-1 font-mono text-[10px] text-error hover:bg-error-container/50"
@@ -1461,6 +1573,17 @@ export default function Show({ session }: { session: SessionProps }) {
 
                 <ComingNext />
             </main>
+
+            {profileOpen && data.me && (
+                <AvatarProfileDialog
+                    name={data.me.name}
+                    style={normalizeAvatarStyle(data.me.avatar?.style)}
+                    seed={data.me.avatar?.seed ?? data.me.name}
+                    saving={profileSaving}
+                    onClose={() => !profileSaving && setProfileOpen(false)}
+                    onSave={saveProfile}
+                />
+            )}
 
             {/* Mobile Bottom Navigation Bar */}
             <nav className="glass-panel fixed bottom-0 left-0 z-40 flex h-16 w-full items-center justify-around border-t border-white/10 px-4 backdrop-blur-xl sm:hidden">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Field = {
     name: string;
@@ -89,6 +89,14 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
     const dissolveMinutes = rule(draft, 'auto_dissolve_minutes', null);
     const guestList = (rule(draft, 'guest_list', []) as string[]).filter(Boolean);
 
+    // Raw string backing the exact-size input — lets the field stay empty
+    // mid-edit instead of snapping to the last valid number.
+    const [sizeDraft, setSizeDraft] = useState(String(minMembers));
+
+    useEffect(() => {
+        setSizeDraft(String(minMembers));
+    }, [minMembers]);
+
     const setSizeMode = (mode: 'exact' | 'range') => {
         if (mode === 'exact') {
             setDraft((current) => ({
@@ -162,16 +170,37 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                                         min={1}
                                         max={50}
                                         step={1}
-                                        value={minMembers}
+                                        value={sizeDraft}
                                         onChange={(e) => {
-                                            const v = Math.max(
-                                                1,
-                                                Math.min(50, Number(e.target.value) || 1),
-                                            );
+                                            // Keep the raw string while typing —
+                                            // an empty field must not snap back
+                                            // to the old value mid-edit.
+                                            setSizeDraft(e.target.value);
+                                            const v = Number(e.target.value);
+                                            if (e.target.value !== '' && Number.isFinite(v)) {
+                                                const clamped = Math.max(
+                                                    1,
+                                                    Math.min(50, Math.round(v)),
+                                                );
+                                                setDraft((current) => ({
+                                                    ...current,
+                                                    min_members: clamped,
+                                                    max_members: clamped,
+                                                }));
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            const v = Number(sizeDraft);
+                                            const clamped =
+                                                sizeDraft === '' ||
+                                                !Number.isFinite(v)
+                                                    ? 1
+                                                    : Math.max(1, Math.min(50, Math.round(v)));
+                                            setSizeDraft(String(clamped));
                                             setDraft((current) => ({
                                                 ...current,
-                                                min_members: v,
-                                                max_members: v,
+                                                min_members: clamped,
+                                                max_members: clamped,
                                             }));
                                         }}
                                         className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary"

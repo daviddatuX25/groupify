@@ -1,5 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
+import { SOUNDS, sound } from '@/lib/sound';
 import { Logo } from '@/components/Logo';
 import {
     isSessionSaved,
@@ -94,6 +95,15 @@ export default function Join({
         qr_token: qrToken,
     });
 
+    // Validation errors (wrong PIN, banned, frozen…) announce with a caution.
+    // Placed before the early return — hooks order must be stable.
+    const hasErrors = Object.keys(errors).length > 0;
+    useEffect(() => {
+        if (hasErrors) {
+            sound.play(SOUNDS.CAUTION);
+        }
+    }, [hasErrors]);
+
     if (checking) {
         return (
             <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-surface px-6 text-on-surface">
@@ -127,6 +137,7 @@ export default function Join({
     };
 
     const submit = () => {
+        sound.play(SOUNDS.BUTTON);
         if (saved) {
             saveSession(
                 session.code,

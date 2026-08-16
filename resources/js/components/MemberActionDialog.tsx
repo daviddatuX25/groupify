@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 type Action = 'move' | 'role' | 'ban';
@@ -92,7 +93,10 @@ export default function MemberActionDialog({
     const roleAvailable = roles.length > 0;
 
     return (
-        <div
+        <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-[#020618]/80 p-4 backdrop-blur-sm"
             role="presentation"
             onMouseDown={(event) => {
@@ -233,6 +237,6 @@ export default function MemberActionDialog({
                     </div>
                 )}
             </section>
-        </div>
+        </motion.div>
     );
 }

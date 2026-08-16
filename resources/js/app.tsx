@@ -1,6 +1,12 @@
 import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react';
+import { MotionConfig } from 'motion/react';
 import { createRoot } from 'react-dom/client';
+import { Toaster } from '@/components/ui/sonner';
 import { configureGroupifyEcho } from '@/lib/echo';
+import { sound } from '@/lib/sound';
+
+// UI sound system (snd-lib, self-hosted sprite) — init once at startup.
+sound.init();
 
 const initialAdminToken = (() => {
     if (typeof window === 'undefined') return '';
@@ -45,13 +51,21 @@ createInertiaApp({
         return page().then((module) => module.default);
     },
     setup({ el, App, props }) {
+        // Global motion gate: prefers-reduced-motion disables all animations.
+        const shell = (
+            <MotionConfig reducedMotion="user">
+                <App {...props} />
+                <Toaster />
+            </MotionConfig>
+        );
+
         if (el) {
-            createRoot(el).render(<App {...props} />);
+            createRoot(el).render(shell);
 
             return;
         }
 
-        return <App {...props} />;
+        return shell;
     },
     progress: {
         color: '#4B5563',

@@ -24,7 +24,7 @@ class ParticipantProfileController
             ->firstOrFail();
 
         $data = $request->validate([
-            'avatar_style' => ['required', 'string', Rule::in(['initials', 'lorelei', 'adventurer', 'bottts-neutral'])],
+            'avatar_style' => ['required', 'string', Rule::in(['initials', 'lorelei', 'adventurer', 'bottts-neutral', 'fun-emoji', 'notionists', 'micah', 'open-peeps', 'pixel-art'])],
             'avatar_seed' => ['required', 'string', 'max:48'],
         ]);
 

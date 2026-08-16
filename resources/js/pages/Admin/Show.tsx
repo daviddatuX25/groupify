@@ -1,13 +1,17 @@
 import { echo } from '@laravel/echo-react';
+import { motion } from 'motion/react';
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import GroupCreateDialog from '@/components/GroupCreateDialog';
 import { Logo } from '@/components/Logo';
+import SoundToggle from '@/components/SoundToggle';
 import MemberActionDialog from '@/components/MemberActionDialog';
 import ParticipantAvatar from '@/components/ParticipantAvatar';
 import ServerStatus from '@/components/ServerStatus';
 import { configureGroupifyEcho } from '@/lib/echo';
 import { saveAdminToken, saveSession } from '@/lib/savedSessions';
+import { SOUNDS, sound } from '@/lib/sound';
 import ConfigEditor from './ConfigEditor';
 import PermsEditor from './PermsEditor';
 import PluginsPanel from './PluginsPanel';
@@ -34,7 +38,7 @@ type QuizQuestion = {
     q: string;
     options: string[];
     answer: number;
-    points: number;
+    points: number | string;
 };
 type BoardConfig = {
     rules: Record<string, unknown>;
@@ -320,11 +324,23 @@ export default function Show({
                 throw new Error('One or more participant actions failed.');
             }
 
+            const label =
+                action === 'move'
+                    ? value === 'pool'
+                        ? 'Moved to the pool'
+                        : 'Moved to group'
+                    : action === 'role'
+                      ? 'Role assigned'
+                      : 'Participant banned';
+            toast.success(label);
+            sound.play(SOUNDS.BUTTON);
             setSelectedParticipantIds([]);
             setMemberDialog(null);
             refetch();
         } catch {
             setActionError('Participant action failed — try again.');
+            toast.error('Participant action failed — try again.');
+            sound.play(SOUNDS.CAUTION);
         } finally {
             setMemberActionBusy(false);
         }
@@ -401,7 +417,7 @@ export default function Show({
             .split('; ')
             .find((c) => c.startsWith('XSRF-TOKEN='))
             ?.split('=')[1];
-        void fetch(url, {
+        return fetch(url, {
             method,
             headers: {
                 'Content-Type': 'application/json',
@@ -414,6 +430,8 @@ export default function Show({
             if (r.ok) {
                 refetch();
             }
+
+            return r;
         });
     };
     const openCreateGroup = () => {
@@ -504,6 +522,12 @@ export default function Show({
                 .then(() => {
                     refetch();
                     closeCreateGroup();
+                    toast.success(
+                        bulk
+                            ? `${count} groups created`
+                            : `Group "${createGroupName.trim() || 'Team Alpha'}" created`,
+                    );
+                    sound.play(SOUNDS.CELEBRATION);
                 })
                 .catch((err: unknown) => {
                     if (err instanceof Error && err.name === 'AbortError') {
@@ -522,6 +546,7 @@ export default function Show({
                 .finally(() => {
                     window.clearTimeout(timeoutId);
                     setCreateGroupBusy(false);
+                    sound.stop(SOUNDS.PROGRESS_LOOP);
                 });
         } catch {
             window.clearTimeout(timeoutId);
@@ -548,6 +573,20 @@ export default function Show({
             .then((r) => {
                 if (r.ok) {
                     setActionError(null);
+                    toast.success(
+                        action === 'freeze'
+                            ? 'Session frozen — joins are paused'
+                            : action === 'unfreeze'
+                              ? 'Session unfrozen — joins resumed'
+                              : action === 'archive'
+                                ? 'Session archived'
+                                : 'Session updated',
+                    );
+                    sound.play(
+                        action === 'freeze'
+                            ? SOUNDS.TOGGLE_OFF
+                            : SOUNDS.TOGGLE_ON,
+                    );
                     refetch();
 
                     return;
@@ -555,16 +594,24 @@ export default function Show({
 
                 return r
                     .json()
-                    .then((j) =>
-                        setActionError(
-                            j.message ?? `Request failed (${r.status}).`,
-                        ),
-                    )
-                    .catch(() =>
-                        setActionError(`Request failed (${r.status}).`),
-                    );
+                    .then((j) => {
+                        const message =
+                            j.message ?? `Request failed (${r.status}).`;
+                        setActionError(message);
+                        toast.error(message);
+                        sound.play(SOUNDS.CAUTION);
+                    })
+                    .catch(() => {
+                        const message = `Request failed (${r.status}).`;
+                        setActionError(message);
+                        toast.error(message);
+                    });
             })
-            .catch(() => setActionError('Network error — try again.'));
+            .catch(() => {
+                setActionError('Network error — try again.');
+                toast.error('Network error — try again.');
+                sound.play(SOUNDS.CAUTION);
+            });
     };
 
     const toggleExtension = (key: string, enabled: boolean) => {
@@ -592,10 +639,16 @@ export default function Show({
 
             if (e.key === 'i') {
                 setShowJoinInfo((v) => !v);
+                sound.play(SOUNDS.SELECT);
+                toast.info(
+                    showJoinInfo ? 'Join info hidden (i)' : 'Join info shown (i)',
+                );
             }
 
             if (e.key === 'h') {
                 setShowBoard((v) => !v);
+                sound.play(SOUNDS.SELECT);
+                toast.info(showBoard ? 'Board hidden (h)' : 'Board shown (h)');
             }
         };
         window.addEventListener('keydown', onKey);
@@ -710,7 +763,14 @@ export default function Show({
                     <button
                         type="button"
                         onClick={() =>
-                            act(`/admin/sessions/${session.id}/auto-distribute`)
+                            act(
+                                `/admin/sessions/${session.id}/auto-distribute`,
+                            ).then((r) => {
+                                if (r.ok) {
+                                    toast.success('Pool distributed');
+                                    sound.play(SOUNDS.CELEBRATION);
+                                }
+                            })
                         }
                         disabled={data.pool.length === 0}
                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-container py-3 font-mono text-xs font-bold tracking-wider text-black uppercase shadow-[0_0_15px_rgba(78,222,61,0.35)] transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
@@ -910,7 +970,16 @@ export default function Show({
                                             onClick={() =>
                                                 act(
                                                     `/admin/sessions/${session.id}/dissolve`,
-                                                )
+                                                ).then((r) => {
+                                                    if (r.ok) {
+                                                        toast.success(
+                                                            'All groups dissolved',
+                                                        );
+                                                        sound.play(
+                                                            SOUNDS.CAUTION,
+                                                        );
+                                                    }
+                                                })
                                             }
                                             className="rounded-xl border border-error/40 bg-error/10 px-4 py-2 font-mono text-xs font-bold tracking-wider text-error uppercase transition-all hover:bg-error/20 active:scale-95"
                                         >
@@ -925,6 +994,7 @@ export default function Show({
                                             </span>
                                             <span>Export</span>
                                         </a>
+                                        <SoundToggle />
                                     </div>
                                 </div>
 
@@ -1195,7 +1265,12 @@ export default function Show({
                                     </div>
                                 </div>
                                 {selectedParticipantIds.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-secondary/25 bg-secondary/5 px-3 py-2.5">
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.18 }}
+                                        className="flex flex-wrap items-center gap-2 rounded-xl border border-secondary/25 bg-secondary/5 px-3 py-2.5"
+                                    >
                                         <span className="mr-1 text-xs font-semibold text-secondary">
                                             {selectedParticipantIds.length}{' '}
                                             selected
@@ -1246,7 +1321,7 @@ export default function Show({
                                         >
                                             Clear
                                         </button>
-                                    </div>
+                                    </motion.div>
                                 )}
                             </div>
                             {groupView === 'cards' ? (
@@ -1356,6 +1431,9 @@ export default function Show({
                                                                                 m.avatar
                                                                             }
                                                                             size="sm"
+                                                                            leader={
+                                                                                m.role === 'leader'
+                                                                            }
                                                                         />
                                                                         <span
                                                                             className={`truncate ${m.role === 'leader' ? 'font-bold text-on-surface' : 'text-on-surface-variant'}`}
@@ -1490,6 +1568,9 @@ export default function Show({
                                                                         member.avatar
                                                                     }
                                                                     size="sm"
+                                                                    leader={
+                                                                        member.role === 'leader'
+                                                                    }
                                                                 />
                                                                 {member.name}
                                                                 <span className="material-symbols-outlined text-[14px] text-on-surface-variant/70">
@@ -1893,6 +1974,12 @@ export default function Show({
                                                     ).then((r) => {
                                                         if (r.ok) {
                                                             refetch();
+                                                            toast.success(
+                                                                'Announcement sent',
+                                                            );
+                                                            sound.play(
+                                                                SOUNDS.BUTTON,
+                                                            );
                                                         }
                                                     });
                                                 }
@@ -1992,11 +2079,12 @@ export default function Show({
                                                                                 qi
                                                                                     ? {
                                                                                           ...x,
-                                                                                          points: Number(
-                                                                                              e
-                                                                                                  .target
-                                                                                                  .value,
-                                                                                          ),
+                                                                                          // Keep the raw string while
+                                                                                          // typing — an empty field must
+                                                                                          // not snap back to 0 mid-edit.
+                                                                                          points: e
+                                                                                              .target
+                                                                                              .value,
                                                                                       }
                                                                                     : x,
                                                                         ),
@@ -2171,7 +2259,13 @@ export default function Show({
                                                                                             Boolean,
                                                                                         ),
                                                                                 answer: qq.answer,
-                                                                                points: qq.points,
+                                                                                // Empty/invalid → 1 (the min); the field stays
+                                                                                // a raw string while editing.
+                                                                                points:
+                                                                                    Number(
+                                                                                        qq.points,
+                                                                                    ) ||
+                                                                                    1,
                                                                             }),
                                                                         ),
                                                             },
@@ -2387,13 +2481,18 @@ export default function Show({
                                     filterable?: boolean;
                                 }[]
                             }
-                            onSave={(payload) =>
+                            onSave={(payload) => {
                                 act(
                                     `/admin/sessions/${session.id}/config`,
                                     payload,
                                     'PUT',
-                                )
-                            }
+                                ).then((r) => {
+                                    if (r.ok) {
+                                        toast.success('Settings saved');
+                                        sound.play(SOUNDS.BUTTON);
+                                    }
+                                });
+                            }}
                         />
                     )}
 
@@ -2704,7 +2803,14 @@ export default function Show({
                     <button
                         type="button"
                         onClick={() =>
-                            act(`/admin/sessions/${session.id}/auto-distribute`)
+                            act(
+                                `/admin/sessions/${session.id}/auto-distribute`,
+                            ).then((r) => {
+                                if (r.ok) {
+                                    toast.success('Pool distributed');
+                                    sound.play(SOUNDS.CELEBRATION);
+                                }
+                            })
                         }
                         disabled={data.pool.length === 0}
                         className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-container px-6 py-2.5 font-mono text-xs font-bold tracking-wider text-black uppercase shadow-[0_0_15px_rgba(78,222,61,0.35)] transition-all hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"

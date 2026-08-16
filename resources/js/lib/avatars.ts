@@ -3,6 +3,11 @@ export const AVATAR_STYLES = [
     { value: 'lorelei', label: 'Lorelei' },
     { value: 'adventurer', label: 'Adventurer' },
     { value: 'bottts-neutral', label: 'Bots' },
+    { value: 'fun-emoji', label: 'Emoji' },
+    { value: 'notionists', label: 'Notionists' },
+    { value: 'micah', label: 'Micah' },
+    { value: 'open-peeps', label: 'Peeps' },
+    { value: 'pixel-art', label: 'Pixel' },
 ] as const;
 
 export type AvatarStyle = (typeof AVATAR_STYLES)[number]['value'];

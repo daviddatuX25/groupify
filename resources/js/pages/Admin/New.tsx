@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Logo } from '@/components/Logo';
 import { saveSession } from '@/lib/savedSessions';
+import { SOUNDS, sound } from '@/lib/sound';
 
 type JoinMode = 'open' | 'approval';
 type EndMode = '1h' | '12h' | '1d' | '1w' | '1m' | 'manual' | 'custom';
@@ -143,10 +144,12 @@ export default function New() {
     const handleContinue = () => {
         if (step < setupSteps.length - 1) {
             setStep((current) => Math.min(setupSteps.length - 1, current + 1));
+            sound.play(SOUNDS.SWIPE);
 
             return;
         }
 
+        sound.play(SOUNDS.BUTTON);
         createSession();
     };
 
@@ -188,7 +191,10 @@ export default function New() {
                         >
                             <button
                                 type="button"
-                                onClick={() => setStep(index)}
+                                onClick={() => {
+                                    setStep(index);
+                                    sound.play(SOUNDS.SELECT);
+                                }}
                                 aria-current={
                                     step === index ? 'step' : undefined
                                 }
