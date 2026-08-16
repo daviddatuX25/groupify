@@ -43,6 +43,15 @@ services:
     volumes:
       - groupify-sqlite:/var/www/html/database/data
       - groupify-storage:/var/www/html/storage
+    # Hard memory/cpu cap — VM205 is 6GB and co-hosts schoolworks. Without
+    # this limit the single container (php-fpm + nginx + queue + reverb +
+    # scheduler) can balloon and push the VM/host into OOM (observed:
+    # host hung at ~99% RAM). Keep it tight.
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: "1.5"
     restart: unless-stopped
 
 volumes:
