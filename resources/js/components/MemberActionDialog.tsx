@@ -5,13 +5,14 @@ type GroupOption = { id: number; name: string };
 type MemberOption = { id: number; name: string; groupName: string };
 
 type Props = {
-    action: Action;
+    /** null = show the action chooser first (person click). */
+    action: Action | null;
     members: MemberOption[];
     groups: GroupOption[];
     roles: string[];
     initialValue?: string;
     onClose: () => void;
-    onConfirm: (value: string) => void;
+    onConfirm: (action: Action, value: string) => void;
 };
 
 const COPY: Record<Action, { title: string; description: string; confirm: string }> = {
@@ -32,26 +33,72 @@ const COPY: Record<Action, { title: string; description: string; confirm: string
     },
 };
 
-export default function MemberActionDialog({ action, members, groups, roles, initialValue, onClose, onConfirm }: Props) {
-    const [value, setValue] = useState(action === 'move' ? 'pool' : (initialValue ?? ''));
-    const closeRef = useRef<HTMLButtonElement>(null);
-    const copy = COPY[action];
+const CHOICE_ORDER: Action[] = ['move', 'role', 'ban'];
+
+const CHOICE_COPY: Record<Action, { label: string; hint: string }> = {
+    move: { label: 'Move', hint: 'Send to another group or back to the pool' },
+    role: { label: 'Assign role', hint: 'Grant a custom permission set' },
+    ban: { label: 'Ban', hint: 'Remove and block from rejoining' },
+};
+
+function useLatest<T>(value: T) {
+    const ref = useRef(value);
+    useEffect(() => {
+        ref.current = value;
+    }, [value]);
+
+    return ref;
+}
+
+export default function MemberActionDialog({
+    action,
+    members,
+    groups,
+    roles,
+    initialValue,
+    onClose,
+    onConfirm,
+}: Props) {
+    const [chosen, setChosen] = useState<Action | null>(action);
+    const [value, setValue] = useState(
+        action === 'move' ? 'pool' : (initialValue ?? ''),
+    );
+    const onCloseRef = useLatest(onClose);
+    const activeAction = chosen ?? action;
 
     useEffect(() => {
-        closeRef.current?.focus();
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') onClose();
+            if (event.key === 'Escape') {
+                onCloseRef.current();
+            }
         };
+
         window.addEventListener('keydown', onKeyDown);
+
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [onClose]);
+    }, [onCloseRef]);
+
+    const pick = (next: Action) => {
+        setChosen(next);
+        setValue(next === 'move' ? 'pool' : '');
+    };
+
+    const title =
+        activeAction === null ? 'Participant actions' : COPY[activeAction].title;
+    const description =
+        activeAction === null
+            ? 'Choose what to do with the selected participant(s).'
+            : COPY[activeAction].description;
+    const roleAvailable = roles.length > 0;
 
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-[#020618]/80 p-4 backdrop-blur-sm"
             role="presentation"
             onMouseDown={(event) => {
-                if (event.target === event.currentTarget) onClose();
+                if (event.target === event.currentTarget) {
+                    onClose();
+                }
             }}
         >
             <section
@@ -63,12 +110,11 @@ export default function MemberActionDialog({ action, members, groups, roles, ini
                 <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
                     <div>
                         <h2 id="member-action-title" className="font-display text-lg font-bold text-on-surface">
-                            {copy.title}
+                            {title}
                         </h2>
-                        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{copy.description}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{description}</p>
                     </div>
                     <button
-                        ref={closeRef}
                         type="button"
                         onClick={onClose}
                         className="rounded-lg px-2 py-1 text-on-surface-variant transition-colors hover:bg-surface-variant/50 hover:text-on-surface"
@@ -90,62 +136,102 @@ export default function MemberActionDialog({ action, members, groups, roles, ini
                     </ul>
                 </div>
 
-                {action === 'move' && (
-                    <label className="mt-4 block">
-                        <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Destination</span>
-                        <select
-                            autoFocus
-                            value={value}
-                            onChange={(event) => setValue(event.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary"
-                        >
-                            <option value="pool">Unassigned pool</option>
-                            {groups.map((group) => (
-                                <option key={group.id} value={String(group.id)}>
-                                    {group.name}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                {activeAction === null ? (
+                    <div className="mt-4 space-y-2">
+                        {CHOICE_ORDER.map((choice, index) => {
+                            const disabled = choice === 'role' && !roleAvailable;
+                            const copy = CHOICE_COPY[choice];
+
+                            return (
+                                <button
+                                    key={choice}
+                                    type="button"
+                                    autoFocus={index === 0}
+                                    disabled={disabled}
+                                    onClick={() => pick(choice)}
+                                    className={`flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                                        choice === 'ban'
+                                            ? 'border-error/25 bg-error-container/10 hover:border-error/50 hover:bg-error-container/20'
+                                            : 'border-white/10 bg-surface-container-lowest hover:border-secondary/50 hover:bg-secondary/5'
+                                    }`}
+                                >
+                                    <span>
+                                        <span className="block text-xs font-semibold text-on-surface">
+                                            {copy.label}
+                                        </span>
+                                        <span className="mt-0.5 block text-[10px] text-on-surface-variant">
+                                            {copy.hint}
+                                        </span>
+                                    </span>
+                                    <span className="material-symbols-outlined text-[16px] text-on-surface-variant">
+                                        chevron_right
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <>
+                        {activeAction === 'move' && (
+                            <label className="mt-4 block">
+                                <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Destination</span>
+                                <select
+                                    autoFocus
+                                    value={value}
+                                    onChange={(event) => setValue(event.target.value)}
+                                    className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary"
+                                >
+                                    <option value="pool">Unassigned pool</option>
+                                    {groups.map((group) => (
+                                        <option key={group.id} value={String(group.id)}>
+                                            {group.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        )}
+
+                        {activeAction === 'role' && (
+                            <label className="mt-4 block">
+                                <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Custom role</span>
+                                <select
+                                    autoFocus
+                                    value={value}
+                                    onChange={(event) => setValue(event.target.value)}
+                                    className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary"
+                                >
+                                    <option value="">No custom role</option>
+                                    {roles.map((role) => <option key={role} value={role}>{role}</option>)}
+                                </select>
+                            </label>
+                        )}
+
+                        {activeAction === 'ban' && (
+                            <div className="mt-4 rounded-xl border border-error/30 bg-error-container/15 p-3 text-xs leading-relaxed text-error">
+                                This action affects {members.length === 1 ? 'this participant' : `all ${members.length} selected participants`} immediately.
+                            </div>
+                        )}
+                    </>
                 )}
 
-                {action === 'role' && (
-                    <label className="mt-4 block">
-                        <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Custom role</span>
-                        <select
-                            autoFocus
-                            value={value}
-                            onChange={(event) => setValue(event.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary"
+                {activeAction !== null && (
+                    <div className="mt-5 flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-variant/40 hover:text-on-surface"
                         >
-                            <option value="">No custom role</option>
-                            {roles.map((role) => <option key={role} value={role}>{role}</option>)}
-                        </select>
-                    </label>
-                )}
-
-                {action === 'ban' && (
-                    <div className="mt-4 rounded-xl border border-error/30 bg-error-container/15 p-3 text-xs leading-relaxed text-error">
-                        This action affects {members.length === 1 ? 'this participant' : `all ${members.length} selected participants`} immediately.
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onConfirm(activeAction, value)}
+                            className={`rounded-xl px-4 py-2.5 text-xs font-bold transition-colors hover:brightness-110 ${activeAction === 'ban' ? 'bg-error text-white' : 'bg-secondary text-on-secondary'}`}
+                        >
+                            {COPY[activeAction].confirm}
+                        </button>
                     </div>
                 )}
-
-                <div className="mt-5 flex justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-variant/40 hover:text-on-surface"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onConfirm(value)}
-                        className={`rounded-xl px-4 py-2.5 text-xs font-bold transition-colors hover:brightness-110 ${action === 'ban' ? 'bg-error text-white' : 'bg-secondary text-on-secondary'}`}
-                    >
-                        {copy.confirm}
-                    </button>
-                </div>
             </section>
         </div>
     );

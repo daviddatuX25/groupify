@@ -137,7 +137,7 @@ export default function Show({
         number[]
     >([]);
     const [memberDialog, setMemberDialog] = useState<{
-        action: 'move' | 'role' | 'ban';
+        action: 'move' | 'role' | 'ban' | null;
         ids: number[];
     } | null>(null);
     const [memberActionBusy, setMemberActionBusy] = useState(false);
@@ -255,13 +255,16 @@ export default function Show({
     };
 
     const openMemberAction = (
-        action: 'move' | 'role' | 'ban',
+        action: 'move' | 'role' | 'ban' | null,
         ids: number[],
     ) => {
         setMemberDialog({ action, ids });
     };
 
-    const confirmMemberAction = async (value: string) => {
+    const confirmMemberAction = async (
+        action: 'move' | 'role' | 'ban',
+        value: string,
+    ) => {
         if (memberDialog === null || memberActionBusy) {
             return;
         }
@@ -271,23 +274,30 @@ export default function Show({
             .split('; ')
             .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
             ?.split('=')[1];
+        let xsrfToken: string | undefined;
+
+        try {
+            xsrfToken = xsrf ? decodeURIComponent(xsrf) : undefined;
+        } catch {
+            xsrfToken = undefined;
+        }
 
         try {
             const responses = await Promise.all(
                 memberDialog.ids.map((id) => {
                     const endpoint =
-                        memberDialog.action === 'move'
+                        action === 'move'
                             ? `/admin/sessions/${session.id}/members/${id}/move`
-                            : memberDialog.action === 'role'
+                            : action === 'role'
                               ? `/admin/sessions/${session.id}/members/${id}/role`
                               : `/admin/sessions/${session.id}/members/${id}/ban`;
                     const payload =
-                        memberDialog.action === 'move'
+                        action === 'move'
                             ? {
                                   to_group_id:
                                       value === 'pool' ? null : Number(value),
                               }
-                            : memberDialog.action === 'role'
+                            : action === 'role'
                               ? { role: value === '' ? null : value }
                               : { banned: true };
 
@@ -297,8 +307,8 @@ export default function Show({
                             'Content-Type': 'application/json',
                             Accept: 'application/json',
                             'X-Admin-Token': adminToken,
-                            ...(xsrf
-                                ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) }
+                            ...(xsrfToken
+                                ? { 'X-XSRF-TOKEN': xsrfToken }
                                 : {}),
                         },
                         body: JSON.stringify(payload),
@@ -563,7 +573,7 @@ export default function Show({
         ).filter((e) => e !== key);
         act(`/admin/sessions/${session.id}/config`, {
             plugins: enabled ? [...current, key] : current,
-        });
+        }, 'PUT');
     };
 
     // 3-7: projection hotkeys — i toggles join info, h hides the board (Mentimeter pattern)
@@ -1127,7 +1137,7 @@ export default function Show({
                                                     allParticipantsSelected
                                                 }
                                                 onChange={toggleAllParticipants}
-                                                className="h-3.5 w-3.5 accent-primary"
+                                                className="groupify-check"
                                                 aria-label="Select all participants"
                                             />
                                             Select all
@@ -1324,69 +1334,50 @@ export default function Show({
                                                                                 m.id,
                                                                             )
                                                                         }
-                                                                        className="h-3.5 w-3.5 shrink-0 accent-primary"
+                                                                        className="groupify-check shrink-0"
                                                                         aria-label={`Select ${m.name}`}
                                                                     />
-                                                                    <ParticipantAvatar
-                                                                        name={
-                                                                            m.name
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            openMemberAction(
+                                                                                null,
+                                                                                [m.id],
+                                                                            )
                                                                         }
-                                                                        avatar={
-                                                                            m.avatar
-                                                                        }
-                                                                        size="sm"
-                                                                    />
-                                                                    <span
-                                                                        className={`truncate ${m.role === 'leader' ? 'font-bold text-on-surface' : 'text-on-surface-variant'}`}
+                                                                        className="flex min-w-0 items-center gap-2 text-left transition-colors hover:text-secondary"
+                                                                        aria-label={`Actions for ${m.name}`}
                                                                     >
-                                                                        {m.name}
-                                                                    </span>
-                                                                    {m.role ===
-                                                                        'leader' && (
-                                                                        <span className="py-0.2 rounded bg-primary/15 px-1.5 font-mono text-[9px] font-bold text-primary">
-                                                                            lead
-                                                                        </span>
-                                                                    )}
-                                                                    {m.custom_role && (
-                                                                        <span className="py-0.2 hidden rounded bg-secondary/10 px-1.5 font-mono text-[9px] text-secondary sm:inline">
-                                                                            {
-                                                                                m.custom_role
+                                                                        <ParticipantAvatar
+                                                                            name={
+                                                                                m.name
                                                                             }
+                                                                            avatar={
+                                                                                m.avatar
+                                                                            }
+                                                                            size="sm"
+                                                                        />
+                                                                        <span
+                                                                            className={`truncate ${m.role === 'leader' ? 'font-bold text-on-surface' : 'text-on-surface-variant'}`}
+                                                                        >
+                                                                            {m.name}
                                                                         </span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex shrink-0 items-center gap-1">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            openMemberAction(
-                                                                                'move',
-                                                                                [
-                                                                                    m.id,
-                                                                                ],
-                                                                            )
-                                                                        }
-                                                                        className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-on-surface-variant hover:border-secondary/50 hover:text-secondary"
-                                                                    >
-                                                                        Move
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            openMemberAction(
-                                                                                'role',
-                                                                                [
-                                                                                    m.id,
-                                                                                ],
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            roleNames.length ===
-                                                                            0
-                                                                        }
-                                                                        className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-on-surface-variant hover:border-secondary/50 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-40"
-                                                                    >
-                                                                        Role
+                                                                        {m.role ===
+                                                                            'leader' && (
+                                                                            <span className="py-0.2 rounded bg-primary/15 px-1.5 font-mono text-[9px] font-bold text-primary">
+                                                                                lead
+                                                                            </span>
+                                                                        )}
+                                                                        {m.custom_role && (
+                                                                            <span className="py-0.2 hidden rounded bg-secondary/10 px-1.5 font-mono text-[9px] text-secondary sm:inline">
+                                                                                {
+                                                                                    m.custom_role
+                                                                                }
+                                                                            </span>
+                                                                        )}
+                                                                        <span className="material-symbols-outlined text-[14px] text-on-surface-variant/70">
+                                                                            more_horiz
+                                                                        </span>
                                                                     </button>
                                                                 </div>
                                                             </li>
@@ -1450,9 +1441,6 @@ export default function Show({
                                                 <th className="px-4 py-3 font-mono text-[10px] font-bold tracking-widest text-on-surface-variant uppercase">
                                                     Role
                                                 </th>
-                                                <th className="px-4 py-3 text-right font-mono text-[10px] font-bold tracking-widest text-on-surface-variant uppercase">
-                                                    Actions
-                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1473,7 +1461,7 @@ export default function Show({
                                                                         member.id,
                                                                     )
                                                                 }
-                                                                className="h-3.5 w-3.5 accent-primary"
+                                                                className="groupify-check"
                                                                 aria-label={`Select ${member.name}`}
                                                             />
                                                         </td>
@@ -1481,7 +1469,19 @@ export default function Show({
                                                             {group.name}
                                                         </td>
                                                         <td className="px-4 py-3">
-                                                            <span className="flex items-center gap-2 font-semibold text-on-surface">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    openMemberAction(
+                                                                        null,
+                                                                        [
+                                                                            member.id,
+                                                                        ],
+                                                                    )
+                                                                }
+                                                                className="flex items-center gap-2 font-semibold text-on-surface transition-colors hover:text-secondary"
+                                                                aria-label={`Actions for ${member.name}`}
+                                                            >
                                                                 <ParticipantAvatar
                                                                     name={
                                                                         member.name
@@ -1492,7 +1492,10 @@ export default function Show({
                                                                     size="sm"
                                                                 />
                                                                 {member.name}
-                                                            </span>
+                                                                <span className="material-symbols-outlined text-[14px] text-on-surface-variant/70">
+                                                                    more_horiz
+                                                                </span>
+                                                            </button>
                                                         </td>
                                                         <td className="px-4 py-3 text-on-surface-variant">
                                                             <span
@@ -1513,42 +1516,6 @@ export default function Show({
                                                                     }
                                                                 </span>
                                                             )}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <div className="flex justify-end gap-1">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        openMemberAction(
-                                                                            'move',
-                                                                            [
-                                                                                member.id,
-                                                                            ],
-                                                                        )
-                                                                    }
-                                                                    className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-on-surface-variant hover:border-secondary/50 hover:text-secondary"
-                                                                >
-                                                                    Move
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        openMemberAction(
-                                                                            'role',
-                                                                            [
-                                                                                member.id,
-                                                                            ],
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        roleNames.length ===
-                                                                        0
-                                                                    }
-                                                                    className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-on-surface-variant hover:border-secondary/50 hover:text-secondary disabled:cursor-not-allowed disabled:opacity-40"
-                                                                >
-                                                                    Role
-                                                                </button>
-                                                            </div>
                                                         </td>
                                                     </tr>
                                                 )),
@@ -2424,6 +2391,7 @@ export default function Show({
                                 act(
                                     `/admin/sessions/${session.id}/config`,
                                     payload,
+                                    'PUT',
                                 )
                             }
                         />
@@ -2698,45 +2666,29 @@ export default function Show({
                                         p.id,
                                     )}
                                     onChange={() => toggleParticipant(p.id)}
-                                    className="h-3.5 w-3.5 accent-primary"
+                                    className="groupify-check"
                                     aria-label={`Select ${p.name}`}
                                 />
-                                <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_6px_#6dfc57]" />
-                                <span className="font-medium text-on-surface">
-                                    {p.name}
-                                </span>
-                                {p.custom_role && (
-                                    <span className="font-mono text-[9px] text-secondary">
-                                        {p.custom_role}
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        openMemberAction(null, [p.id])
+                                    }
+                                    className="inline-flex items-center gap-1.5 rounded-full text-left transition-colors hover:text-secondary"
+                                    aria-label={`Actions for ${p.name}`}
+                                >
+                                    <span className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_6px_#6dfc57]" />
+                                    <span className="font-medium text-on-surface">
+                                        {p.name}
                                     </span>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        openMemberAction('move', [p.id])
-                                    }
-                                    className="rounded bg-surface-variant/60 px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant hover:text-secondary"
-                                >
-                                    move
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        openMemberAction('role', [p.id])
-                                    }
-                                    disabled={roleNames.length === 0}
-                                    className="rounded bg-surface-variant/60 px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant hover:text-secondary disabled:cursor-not-allowed disabled:opacity-40"
-                                >
-                                    role
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        openMemberAction('ban', [p.id])
-                                    }
-                                    className="rounded bg-error-container/30 px-1.5 py-0.5 font-mono text-[9px] text-error hover:bg-error-container/50"
-                                >
-                                    ban
+                                    {p.custom_role && (
+                                        <span className="font-mono text-[9px] text-secondary">
+                                            {p.custom_role}
+                                        </span>
+                                    )}
+                                    <span className="material-symbols-outlined text-[14px] text-on-surface-variant/70">
+                                        more_horiz
+                                    </span>
                                 </button>
                             </span>
                         ))}

@@ -85,13 +85,16 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
 
     const minMembers = Number(rule(draft, 'min_members', 1));
     const maxMembers = Number(rule(draft, 'max_members', 5));
-    const sizePreset = minMembers === maxMembers && (minMembers === 1 || minMembers === 2) ? String(minMembers) : 'custom';
+    const sizeMode = minMembers === maxMembers ? 'exact' : 'range';
     const dissolveMinutes = rule(draft, 'auto_dissolve_minutes', null);
     const guestList = (rule(draft, 'guest_list', []) as string[]).filter(Boolean);
 
-    const setGroupPreset = (preset: string) => {
-        if (preset === '1' || preset === '2') {
-            setDraft((current) => ({ ...current, min_members: Number(preset), max_members: Number(preset) }));
+    const setSizeMode = (mode: 'exact' | 'range') => {
+        if (mode === 'exact') {
+            setDraft((current) => ({
+                ...current,
+                max_members: Math.max(1, Number(current.min_members ?? 1)),
+            }));
         }
     };
 
@@ -118,23 +121,24 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                                 <p className="mt-1 text-xs text-on-surface-variant">Choose a fixed team size or let the facilitator set a range.</p>
                             </div>
                             <span className="rounded-full bg-secondary/10 px-2.5 py-1 font-mono text-[11px] font-bold text-secondary">
-                                {sizePreset === 'custom' ? `${minMembers}–${maxMembers} people` : `${minMembers} ${minMembers === 1 ? 'person' : 'people'}`}
+                                {sizeMode === 'exact' ? `${minMembers} ${minMembers === 1 ? 'person' : 'people'}` : `${minMembers}–${maxMembers} people`}
                             </span>
                         </div>
-                        <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Group size preset">
-                            {[
-                                ['1', '1 person', 'Solo groups'],
-                                ['2', '2 people', 'Pairs'],
-                                ['custom', 'Custom', 'Set a range'],
-                            ].map(([value, label, hint]) => (
+                        <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Group size mode">
+                            {(
+                                [
+                                    ['exact', 'Exact size', 'Every team has exactly N people'],
+                                    ['range', 'Range', 'Teams between N and M people'],
+                                ] as const
+                            ).map(([value, label, hint]) => (
                                 <button
                                     key={value}
                                     type="button"
                                     role="radio"
-                                    aria-checked={sizePreset === value}
-                                    onClick={() => setGroupPreset(value)}
+                                    aria-checked={sizeMode === value}
+                                    onClick={() => setSizeMode(value)}
                                     className={`rounded-xl border p-3 text-left transition-colors ${
-                                        sizePreset === value
+                                        sizeMode === value
                                             ? 'border-secondary/60 bg-secondary/10 text-secondary'
                                             : 'border-white/10 bg-surface-container-low hover:border-white/25 text-on-surface'
                                     }`}
@@ -144,7 +148,37 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                                 </button>
                             ))}
                         </div>
-                        {sizePreset === 'custom' && (
+                        {sizeMode === 'exact' ? (
+                            <div className="mt-4 max-w-[240px]">
+                                <label className="space-y-2">
+                                    <span className="flex items-center justify-between text-[11px] text-on-surface-variant">
+                                        <span>Team size</span>
+                                        <strong className="font-mono text-secondary">
+                                            {minMembers} {minMembers === 1 ? 'person' : 'people'}
+                                        </strong>
+                                    </span>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={50}
+                                        step={1}
+                                        value={minMembers}
+                                        onChange={(e) => {
+                                            const v = Math.max(
+                                                1,
+                                                Math.min(50, Number(e.target.value) || 1),
+                                            );
+                                            setDraft((current) => ({
+                                                ...current,
+                                                min_members: v,
+                                                max_members: v,
+                                            }));
+                                        }}
+                                        className="w-full rounded-xl border border-white/10 bg-surface-container-lowest px-3 py-2.5 text-sm text-on-surface outline-none focus:border-secondary"
+                                    />
+                                </label>
+                            </div>
+                        ) : (
                             <div className="mt-4 grid gap-4 sm:grid-cols-2">
                                 <label className="space-y-2">
                                     <span className="flex items-center justify-between text-[11px] text-on-surface-variant">
@@ -382,7 +416,10 @@ export default function ConfigEditor({ rules, fields, onSave }: Props) {
                         <button
                             type="button"
                             onClick={() => {
-                                if (!newField.name.trim()) return;
+                                if (!newField.name.trim()) {
+                                    return;
+                                }
+
                                 setFieldDrafts((d) => [...d, { ...newField, name: newField.name.trim() }]);
                                 setNewField({ name: '', type: 'text' });
                             }}
