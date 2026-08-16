@@ -1,0 +1,50 @@
+name: groupify
+
+# Dokploy production recipe — same image as the local prod rig (compose.prod.yaml)
+# but as a Compose service so Dokploy manages build + volumes + domain routing.
+# One container = nginx + php-fpm + queue worker + Reverb + scheduler (supervisord).
+# No external cron / queue / WS server — the entrypoint boots everything.
+
+services:
+  groupify:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        # ONLY baked value: Reverb app key (client-visible, must match REVERB_APP_KEY
+        # env below — used to authenticate the WS handshake). Host/port/scheme are
+        # NOT baked: the WS endpoint follows the page origin at runtime, so LAN
+        # phones and the public domain both get realtime.
+        VITE_REVERB_APP_KEY: 6d706efee159448164a52358d642abf4
+    # nginx listens on 80 in-container; /app (WebSocket) is proxied internally to
+    # Reverb on 127.0.0.1:8080 with upgrade headers. Traefik routes by domain.
+    expose: ["80"]
+    environment:
+      APP_ENV: production
+      APP_URL: https://groupify.dxtechph.online
+      # Secrets come from Dokploy env (interpolated at deploy time):
+      APP_KEY: ${APP_KEY}
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/database/data/database.sqlite
+      QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: 127.0.0.1
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+      # SQLite write contention: queue worker + scheduler + web all write the same
+      # file — busy timeout + WAL are mandatory in production.
+      DB_BUSY_TIMEOUT: 30000
+      DB_JOURNAL_MODE: wal
+    volumes:
+      - groupify-sqlite:/var/www/html/database/data
+      - groupify-storage:/var/www/html/storage
+    restart: unless-stopped
+
+volumes:
+  groupify-sqlite:
+  groupify-storage:
