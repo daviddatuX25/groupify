@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('installs the service worker and reports it active', async ({ page }) => {
+test('installs the service worker and reports it active', { tag: '@smoke' }, async ({ page }) => {
     await page.goto('/');
 
     // Fast-fail guard: registration is gated on a production build + secure

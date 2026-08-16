@@ -1,33 +1,10 @@
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import { createSession } from './fixtures/session';
 
-async function createRoom(page: Page): Promise<string> {
-    await page.goto('/new');
-    const xsrf = await page.evaluate(() => {
-        const cookie = document.cookie
-            .split('; ')
-            .find((value) => value.startsWith('XSRF-TOKEN='));
-
-        return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
-    });
-    const created = await page.request.post('/sessions', {
-        headers: { 'X-XSRF-TOKEN': xsrf },
-    });
-    const url = created.url();
-    const sessionId = url.match(/sessions\/(\d+)/)?.[1] ?? '';
-    const adminToken = url.match(/token=(\w+)/)?.[1] ?? '';
-
-    await page.goto(`/admin/sessions/${sessionId}?token=${adminToken}`);
-
-    return (
-        (await page.locator('body').innerText()).match(/\b\d{6}\b/)?.[0] ?? ''
-    );
-}
-
-test('participant can save and remove a room from the homepage', async ({
+test('participant can save and remove a room from the homepage', { tag: '@smoke' }, async ({
     page,
 }) => {
-    const code = await createRoom(page);
+    const { code } = await createSession(page);
     await page.evaluate(() => localStorage.clear());
     await page.goto(`/join/${code}`);
 
@@ -65,8 +42,8 @@ test('participant can save and remove a room from the homepage', async ({
     await expect(page.getByText(code, { exact: true })).toHaveCount(0);
 });
 
-test('host saved room reopens the admin view', async ({ page }) => {
-    const code = await createRoom(page);
+test('host saved room reopens the admin view', { tag: '@smoke' }, async ({ page }) => {
+    const { code } = await createSession(page);
 
     await page.goto('/');
     await expect(page.getByText(code, { exact: true })).toBeVisible();
@@ -80,8 +57,8 @@ test('host saved room reopens the admin view', async ({ page }) => {
     ).toBeVisible();
 });
 
-test('legacy saved host room upgrades to the admin view', async ({ page }) => {
-    const code = await createRoom(page);
+test('legacy saved host room upgrades to the admin view', { tag: '@smoke' }, async ({ page }) => {
+    const { code } = await createSession(page);
 
     await page.evaluate((roomCode) => {
         const sessions = JSON.parse(
@@ -113,7 +90,8 @@ test('legacy saved host room upgrades to the admin view', async ({ page }) => {
         page.getByRole('heading', { name: 'Groupify Admin' }),
     ).toBeVisible();
 });
-test('continue advances setup without creating the room', async ({ page }) => {
+
+test('continue advances setup without creating the room', { tag: '@smoke' }, async ({ page }) => {
     const sessionPosts: string[] = [];
     page.on('request', (request) => {
         if (
@@ -137,7 +115,7 @@ test('continue advances setup without creating the room', async ({ page }) => {
     expect(sessionPosts).toHaveLength(0);
 });
 
-test('creating a room saves it on the host browser', async ({ page }) => {
+test('creating a room saves it on the host browser', { tag: '@smoke' }, async ({ page }) => {
     await page.goto('/new');
     await page.evaluate(() => localStorage.clear());
 
@@ -153,6 +131,10 @@ test('creating a room saves it on the host browser', async ({ page }) => {
     await page.getByRole('button', { name: /create room/i }).click();
     await adminNavigation;
 
+    // Wizard submits via Inertia (URL swaps before the payload renders) and
+    // client-side navigation never refreshes the data-page script — the only
+    // stable source here is the rendered code display.
+    await expect(page.getByText(/^\d{6}$/)).toBeVisible({ timeout: 5000 });
     const code =
         (await page.locator('body').innerText()).match(/\b\d{6}\b/)?.[0] ?? '';
     expect(code).toMatch(/^\d{6}$/);
@@ -161,7 +143,7 @@ test('creating a room saves it on the host browser', async ({ page }) => {
     await expect(page.getByText(code, { exact: true })).toBeVisible();
 });
 
-test('homepage opens the QR scanner affordance', async ({ page }) => {
+test('homepage opens the QR scanner affordance', { tag: '@smoke' }, async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: /scan qr code/i }).click();
     await expect(
@@ -173,7 +155,7 @@ test('homepage opens the QR scanner affordance', async ({ page }) => {
     ).toHaveCount(0);
 });
 
-test('saved-room list ignores malformed and duplicate browser records', async ({
+test('saved-room list ignores malformed and duplicate browser records', { tag: '@smoke' }, async ({
     page,
 }) => {
     await page.goto('/');
@@ -196,7 +178,7 @@ test('saved-room list ignores malformed and duplicate browser records', async ({
     ).toHaveCount(0);
 });
 
-test('session setup uses compact card steps and dot navigation', async ({
+test('session setup uses compact card steps and dot navigation', { tag: '@smoke' }, async ({
     page,
 }) => {
     await page.goto('/new');

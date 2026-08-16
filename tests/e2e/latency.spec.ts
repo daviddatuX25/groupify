@@ -1,55 +1,48 @@
 import { expect, test } from '@playwright/test';
-import { randomUUID } from 'node:crypto';
+import { apiHeaders } from './fixtures/xsrf';
+import { createSession } from './fixtures/session';
+import {
+    fetchBoard,
+    joinViaApi,
+    newDeviceToken,
+    openParticipantView,
+} from './fixtures/participant';
 
 /**
  * CAP-3 propagation: a membership change must reach other clients in ~1s.
  * Realtime path only (no reload fallback). The visibility timeout is the
  * single deadline — the elapsed number is logged for the performance record.
  */
-test('realtime propagation latency stays under 2s', async ({ page }) => {
-    await page.goto('/new');
-    const xsrf = await page.evaluate(() => {
-        const c = document.cookie.split('; ').find((x) => x.startsWith('XSRF-TOKEN='));
-        return c ? decodeURIComponent(c.split('=')[1]) : '';
-    });
-    const created = await page.request.post('/sessions', { headers: { 'X-XSRF-TOKEN': xsrf } });
-    const url = created.url();
-    const sid = url.match(/sessions\/(\d+)/)?.[1] ?? '';
-    const atok = url.match(/token=(\w+)/)?.[1] ?? '';
+test('realtime propagation latency stays under 2s', { tag: '@smoke' }, async ({ page }) => {
+    const s = await createSession(page);
 
-    await page.goto(`/admin/sessions/${sid}?token=${atok}`);
-    const code = (await page.getByText(/\b\d{6}\b/).first().textContent())?.trim() ?? '';
-    const pin = (await page.getByText(/PIN:/).textContent())?.match(/\d{4}/)?.[0] ?? '';
-
-    const tokenA = randomUUID();
-    const tokenB = randomUUID();
-    const join = (t: string, name: string) =>
-        page.request.post(`/join/${code}`, {
-            headers: { 'X-Device-Token': t, 'X-XSRF-TOKEN': xsrf, 'Content-Type': 'application/json' },
-            data: { pin, name, device_token: t },
-        });
-    await join(tokenA, 'Maya');
-    await join(tokenB, 'Leo');
+    const tokenA = newDeviceToken();
+    const tokenB = newDeviceToken();
+    await joinViaApi(page, s, 'Maya', tokenA);
+    await joinViaApi(page, s, 'Leo', tokenB);
 
     // Maya creates a group; Leo joins it; measure until Maya's board reflects it.
     const consoleLogs: string[] = [];
-    page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') consoleLogs.push(m.text()); });
+    page.on('console', (m) => {
+        if (m.type() === 'error' || m.type() === 'warning') {
+            consoleLogs.push(m.text());
+        }
+    });
     page.on('pageerror', (e) => consoleLogs.push('PAGEERROR: ' + String(e)));
-    await page.addInitScript((t) => localStorage.setItem('groupify.device_token', t), tokenA);
-    await page.goto(`/s/${code}?device_token=${tokenA}`);
+    await openParticipantView(page, s.code, tokenA);
     await page.getByRole('button', { name: /create new group/i }).click();
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Team Alpha' })).toBeVisible();
 
-    const gidRes = await page.request.get(`/api/sessions/${code}/board`, { headers: { 'X-Device-Token': tokenA } });
-    const gid = (await gidRes.json()).groups[0].id as number;
+    const boardA = await fetchBoard(page, s.code, tokenA);
+    const gid = boardA.groups[0].id as number;
 
     await page.waitForTimeout(1000); // brief settle for the WS subscription
 
     // Start the clock AFTER the join POST resolves: the visibility timeout is
     // the single deadline — no double accounting of POST/clock overhead.
-    await page.request.post(`/s/${code}/groups/${gid}/join`, {
-        headers: { 'X-Device-Token': tokenB, 'X-XSRF-TOKEN': xsrf, 'Content-Type': 'application/json' },
+    await page.request.post(`/s/${s.code}/groups/${gid}/join`, {
+        headers: apiHeaders(s.xsrf, { 'X-Device-Token': tokenB }),
         data: {},
     });
     const started = Date.now();

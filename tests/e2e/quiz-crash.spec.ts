@@ -1,49 +1,42 @@
 import { test, expect } from '@playwright/test';
-import { randomUUID } from 'node:crypto';
+import { apiHeaders } from './fixtures/xsrf';
+import { createSession, updateConfig } from './fixtures/session';
+import {
+    collectPageErrors,
+} from './fixtures/errors';
+import {
+    createGroupViaApi,
+    fetchBoard,
+    joinViaApi,
+    newDeviceToken,
+    openParticipantView,
+} from './fixtures/participant';
 
-test('participant page renders a live quiz without crashing', async ({ page }) => {
-    const request = page.request;
-    // Self-contained: create a session through the API (shared cookie jar).
-    await page.goto('/new');
-    const xsrf = await page.evaluate(() => {
-        const c = document.cookie.split('; ').find((x) => x.startsWith('XSRF-TOKEN='));
-        return c ? decodeURIComponent(c.split('=')[1]) : '';
-    });
-    const created = await request.post('/sessions', { headers: { 'X-XSRF-TOKEN': xsrf } });
-    expect(created.ok()).toBeTruthy();
-    const finalUrl = created.url();
-    const sid = finalUrl.match(/sessions\/(\d+)/)?.[1];
-    const atok = finalUrl.match(/token=(\w+)/)?.[1];
-    expect(sid && atok).toBeTruthy();
+test('participant page renders a live quiz without crashing', { tag: '@smoke' }, async ({ page }) => {
+    const s = await createSession(page);
 
-    // Admin page: code + PIN + quiz questions.
-    await page.goto(`/admin/sessions/${sid}?token=${atok}`);
-    const code = (await page.getByText(/\b\d{6}\b/).first().textContent())?.trim() ?? '';
-    expect(code).toMatch(/^\d{6}$/);
-    const pin = (await page.getByText(/PIN:/).textContent())?.match(/\d{4}/)?.[0] ?? '';
-    expect(pin).toMatch(/^\d{4}$/);
-
-    const admin = { 'X-Admin-Token': atok, 'X-XSRF-TOKEN': xsrf, 'Content-Type': 'application/json', Accept: 'application/json' };
     // The quiz is an optional extension (flexibility-model.md §3) — enable it first.
-    await request.put(`/admin/sessions/${sid}/config`, { headers: admin, data: { plugins: ['quiz'] } });
-    await request.put(`/admin/sessions/${sid}/quiz`, {
-        headers: admin,
-        data: { questions: [{ q: 'Capital of France?', options: ['Paris', 'Lyon'], answer: 0, points: 10 }] },
+    await updateConfig(page, s, { plugins: ['quiz'] });
+    await page.request.put(`/admin/sessions/${s.sessionId}/quiz`, {
+        headers: apiHeaders(s.xsrf, { 'X-Admin-Token': s.adminToken }),
+        data: {
+            questions: [
+                { q: 'Capital of France?', options: ['Paris', 'Lyon'], answer: 0, points: 10 },
+            ],
+        },
     });
 
     // Participant joins, forms a group, quiz goes live.
-    const token = randomUUID();
-    const participant = { 'X-Device-Token': token, 'X-XSRF-TOKEN': xsrf, 'Content-Type': 'application/json', Accept: 'application/json' };
-    await request.post(`/join/${code}`, { headers: participant, data: { pin, name: 'Maya', device_token: token } });
-    const groupRes = await request.post(`/s/${code}/groups`, { headers: participant, data: {} });
-    expect(groupRes.ok()).toBeTruthy();
-    await request.post(`/admin/sessions/${sid}/quiz/start`, { headers: admin });
+    const token = newDeviceToken();
+    await joinViaApi(page, s, 'Maya', token);
+    await createGroupViaApi(page, s, token);
+    await page.request.post(`/admin/sessions/${s.sessionId}/quiz/start`, {
+        headers: apiHeaders(s.xsrf, { 'X-Admin-Token': s.adminToken }),
+    });
 
     // The participant page must render the live quiz without crashing.
-    const errors: string[] = [];
-    page.on('pageerror', (e) => errors.push(String(e)));
-    await page.addInitScript((t) => localStorage.setItem('groupify.device_token', t), token);
-    await page.goto(`/s/${code}?device_token=${token}`);
+    const errors = collectPageErrors(page);
+    await openParticipantView(page, s.code, token);
     await expect(page.getByText('Capital of France?')).toBeVisible({ timeout: 10000 });
     expect(errors).toEqual([]);
     await page.getByText(/^A\./).click();
@@ -53,9 +46,9 @@ test('participant page renders a live quiz without crashing', async ({ page }) =
     // before asserting the board, so the API check can't race the POST.
     await expect(page.getByText('Capital of France?')).toBeHidden({ timeout: 5000 });
     await expect
-        .poll(async () => (await (await request.get(`/api/sessions/${code}/board`, { headers: { 'X-Device-Token': token } })).json()).quiz.status, { timeout: 5000 })
+        .poll(async () => (await fetchBoard(page, s.code, token)).quiz.status, { timeout: 5000 })
         .toBe('done');
-    const board = await request.get(`/api/sessions/${code}/board`, { headers: { 'X-Device-Token': token } });
-    expect((await board.json()).quiz.leaderboard[0].points).toBe(10);
+    const board = await fetchBoard(page, s.code, token);
+    expect(board.quiz.leaderboard[0].points).toBe(10);
     expect(errors).toEqual([]);
 });

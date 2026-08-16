@@ -1,34 +1,12 @@
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import { createSession } from './fixtures/session';
 
 /**
  * Admin god-mode flows: stats, freeze → join blocked, dissolve, CSV export,
  * group creation focus retention, and single/bulk group creation.
  */
 
-async function createSession(
-    page: Page,
-): Promise<{ code: string; pin: string; adminUrl: string }> {
-    await page.goto('/new');
-    await page.getByRole('button', { name: /go to finish step/i }).click();
-    await page.getByRole('button', { name: /create room/i }).click();
-    await page.waitForURL(/\/admin\/sessions\/\d+/);
-    const adminUrl = page.url();
-
-    const code = await page
-        .locator('body')
-        .innerText()
-        .then((t) => t.match(/\d{6}/)?.[0] ?? '');
-
-    const pin = await page
-        .locator('body')
-        .innerText()
-        .then((t) => t.match(/PIN:\s*(\d{4})/)?.[1] ?? '');
-
-    return { code, pin, adminUrl };
-}
-
-test('admin panel shows QR, PIN, and live stats', async ({ page }) => {
+test('admin panel shows QR, PIN, and live stats', { tag: '@smoke' }, async ({ page }) => {
     const { pin } = await createSession(page);
 
     await expect(page.getByText(/scan to join/i)).toBeVisible();
@@ -38,7 +16,7 @@ test('admin panel shows QR, PIN, and live stats', async ({ page }) => {
     await expect(page.locator('canvas')).toBeVisible();
 });
 
-test('freeze blocks joins; unfreeze resumes', async ({ page, browser }) => {
+test('freeze blocks joins; unfreeze resumes', { tag: '@smoke' }, async ({ page, browser }) => {
     const { code, pin } = await createSession(page);
 
     await page.getByRole('button', { name: 'Freeze', exact: true }).click();
@@ -68,7 +46,7 @@ test('freeze blocks joins; unfreeze resumes', async ({ page, browser }) => {
     await expect(page.getByText('Freeze')).toBeVisible();
 });
 
-test('dissolve all returns everyone to the pool', async ({ page, browser }) => {
+test('dissolve all returns everyone to the pool', { tag: '@smoke' }, async ({ page, browser }) => {
     const { code, pin } = await createSession(page);
 
     const a = await browser.newPage();
@@ -94,7 +72,7 @@ test('dissolve all returns everyone to the pool', async ({ page, browser }) => {
     await a.close();
 });
 
-test('typing in the create-group dialog keeps focus in the active field', async ({
+test('typing in the create-group dialog keeps focus in the active field', { tag: '@smoke' }, async ({
     page,
 }) => {
     await createSession(page);
@@ -114,7 +92,7 @@ test('typing in the create-group dialog keeps focus in the active field', async 
     await expect(nameInput).not.toBeVisible();
 });
 
-test('admin creates a single named group from the dialog', async ({ page }) => {
+test('admin creates a single named group from the dialog', { tag: '@smoke' }, async ({ page }) => {
     await createSession(page);
     await page.getByRole('button', { name: /\+ create group/i }).click();
     await page.getByLabel('Group name').fill('Facilitator Group');
@@ -125,7 +103,7 @@ test('admin creates a single named group from the dialog', async ({ page }) => {
     ).toBeVisible();
 });
 
-test('admin bulk-creates sequential groups and shows them on the board', async ({
+test('admin bulk-creates sequential groups and shows them on the board', { tag: '@smoke' }, async ({
     page,
 }) => {
     await createSession(page);
@@ -148,7 +126,7 @@ test('admin bulk-creates sequential groups and shows them on the board', async (
     ).toBeVisible();
 });
 
-test('a named group can be created from the expanded bulk panel', async ({
+test('a named group can be created from the expanded bulk panel', { tag: '@smoke' }, async ({
     page,
 }) => {
     await createSession(page);
@@ -165,7 +143,7 @@ test('a named group can be created from the expanded bulk panel', async ({
     ).toBeVisible();
 });
 
-test('closing the dialog resets bulk state for a later single submit', async ({
+test('closing the dialog resets bulk state for a later single submit', { tag: '@smoke' }, async ({
     page,
 }) => {
     await createSession(page);
@@ -189,7 +167,7 @@ test('closing the dialog resets bulk state for a later single submit', async ({
     await expect(page.locator('h4')).toHaveCount(5);
 });
 
-test('an empty count shows the client-side error and sends no request', async ({
+test('an empty count shows the client-side error and sends no request', { tag: '@smoke' }, async ({
     page,
 }) => {
     await createSession(page);
@@ -213,7 +191,7 @@ test('an empty count shows the client-side error and sends no request', async ({
     expect(requests).toBe(0);
 });
 
-test('bulk random names are distinct and not sequential', async ({ page }) => {
+test('bulk random names are distinct and not sequential', { tag: '@smoke' }, async ({ page }) => {
     await createSession(page);
     await page.getByRole('button', { name: /\+ create group/i }).click();
     await page.getByRole('button', { name: 'Create multiple' }).click();
@@ -230,7 +208,7 @@ test('bulk random names are distinct and not sequential', async ({ page }) => {
     expect(names.every((name) => !name.startsWith('Team '))).toBe(true);
 });
 
-test('a failed bulk submission shows the error in the dialog', async ({
+test('a failed bulk submission shows the error in the dialog', { tag: '@smoke' }, async ({
     page,
 }) => {
     await createSession(page);
@@ -251,7 +229,7 @@ test('a failed bulk submission shows the error in the dialog', async ({
     await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('a stalled bulk request times out and releases the busy state', async ({
+test('a stalled bulk request times out and releases the busy state', { tag: '@smoke' }, async ({
     page,
 }) => {
     await createSession(page);
@@ -289,7 +267,7 @@ test('a stalled bulk request times out and releases the busy state', async ({
     ).toBeEnabled();
 });
 
-test('clicking a participant opens the action chooser modal', async ({
+test('clicking a participant opens the action chooser modal', { tag: '@smoke' }, async ({
     page,
     browser,
 }) => {
@@ -337,7 +315,7 @@ test('clicking a participant opens the action chooser modal', async ({
     await a.close();
 });
 
-test('saving session rules works and group size offers exact and range', async ({
+test('saving session rules works and group size offers exact and range', { tag: '@smoke' }, async ({
     page,
 }) => {
     await createSession(page);

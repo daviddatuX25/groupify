@@ -36,3 +36,54 @@ jobs:
 
       - name: Run CI Checks
         run: composer ci:check
+
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Build production image
+        run: docker compose -f compose.prod.yaml build
+
+      - name: Start prod stack
+        run: docker compose -f compose.prod.yaml up -d
+
+      - name: Wait for the app
+        run: |
+          for i in $(seq 1 45); do
+            if curl -fsS http://localhost:8081/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "app did not become healthy" >&2
+          exit 1
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e suite
+        run: npx playwright test --reporter=line
+        env:
+          E2E_BASE_URL: http://localhost:8081
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/pw-browsers
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v5.0.0
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

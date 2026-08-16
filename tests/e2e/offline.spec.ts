@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
  * Self-skips where SW registration is impossible (self-signed edge rig —
  * browsers validate the SW script's cert themselves).
  */
-test('renders the app shell from the service worker while offline', async ({ page, context }) => {
+test('renders the app shell from the service worker while offline', { tag: '@smoke' }, async ({ page, context }) => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: 'Groupify home' })).toBeVisible();
 
