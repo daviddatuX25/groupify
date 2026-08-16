@@ -76,6 +76,8 @@ Route::post('/admin/sessions/{session}/participants', [AdminActionsController::c
     ->name('admin.participants.store');
 Route::post('/admin/sessions/{session}/groups', [AdminActionsController::class, 'createGroup'])
     ->name('admin.groups.store');
+Route::post('/admin/sessions/{session}/groups/bulk', [AdminActionsController::class, 'createGroups'])
+    ->name('admin.groups.bulk');
 Route::post('/admin/sessions/{session}/members/{participant}/ban', [AdminActionsController::class, 'ban'])
     ->name('admin.members.ban');
 Route::post('/admin/sessions/{session}/members/{participant}/role', [AdminActionsController::class, 'assignRole'])

@@ -128,6 +128,10 @@ export default function Show({
     const [guestListText, setGuestListText] = useState('');
     const [createGroupName, setCreateGroupName] = useState('');
     const [createGroupCapacity, setCreateGroupCapacity] = useState('');
+    const [createGroupCount, setCreateGroupCount] = useState('1');
+    const [createGroupRandom, setCreateGroupRandom] = useState(false);
+    const [createGroupBusy, setCreateGroupBusy] = useState(false);
+    const [createGroupError, setCreateGroupError] = useState<string | null>(null);
     const [groupView, setGroupView] = useState<'cards' | 'table'>('cards');
     const [selectedParticipantIds, setSelectedParticipantIds] = useState<
         number[]
@@ -402,19 +406,118 @@ export default function Show({
             }
         });
     };
+    const openCreateGroup = () => {
+        setCreateGroupName('');
+        setCreateGroupCapacity('');
+        setCreateGroupCount('1');
+        setCreateGroupRandom(false);
+        setCreateGroupError(null);
+        setCreateGroupOpen(true);
+    };
+
+    const closeCreateGroup = () => {
+        setCreateGroupOpen(false);
+        setCreateGroupName('');
+        setCreateGroupCapacity('');
+        setCreateGroupCount('1');
+        setCreateGroupRandom(false);
+        setCreateGroupError(null);
+    };
+
     const createAdminGroup = () => {
+        if (createGroupBusy) {
+            return;
+        }
+
+        // type=number accepts "1e2" and ignores min/max for typed values, so
+        // validate the raw digits before converting.
+        const countText = createGroupCount.trim();
+        const count = Number(countText);
+
+        if (!/^\d{1,3}$/.test(countText) || count < 1 || count > 200) {
+            setCreateGroupError('Enter a number of groups between 1 and 200.');
+
+            return;
+        }
+
         const name = createGroupName.trim();
         const capacity =
             createGroupCapacity === ''
                 ? undefined
                 : Number(createGroupCapacity);
-        act(`/admin/sessions/${session.id}/groups`, {
-            ...(name ? { name } : {}),
-            ...(capacity ? { capacity } : {}),
-        });
-        setCreateGroupName('');
-        setCreateGroupCapacity('');
-        setCreateGroupOpen(false);
+        const bulk = count > 1 || createGroupRandom;
+        const payload = bulk
+            ? {
+                  count,
+                  ...(capacity !== undefined ? { capacity } : {}),
+                  ...(createGroupRandom ? { random_names: true } : {}),
+              }
+            : {
+                  ...(name ? { name } : {}),
+                  ...(capacity !== undefined ? { capacity } : {}),
+              };
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+
+        setCreateGroupBusy(true);
+        setCreateGroupError(null);
+
+        try {
+            // decodeURIComponent throws on a malformed cookie; decode safely so
+            // the request still goes out and busy is always released.
+            const xsrf = document.cookie
+                .split('; ')
+                .find((c) => c.startsWith('XSRF-TOKEN='))
+                ?.split('=')[1];
+            const xsrfToken = xsrf ? decodeURIComponent(xsrf) : undefined;
+
+            fetch(`/admin/sessions/${session.id}/groups${bulk ? '/bulk' : ''}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-Admin-Token': adminToken,
+                    ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            })
+                .then(async (response) => {
+                    if (!response.ok) {
+                        const body = await response.json().catch(() => null);
+
+                        throw new Error(body?.message ?? `Request failed (${response.status}).`);
+                    }
+
+                    return response.json() as Promise<{ ok: boolean }>;
+                })
+                .then(() => {
+                    refetch();
+                    closeCreateGroup();
+                })
+                .catch((err: unknown) => {
+                    if (err instanceof Error && err.name === 'AbortError') {
+                        // The server may have committed despite the timeout —
+                        // surface the board so committed groups are visible.
+                        refetch();
+                        setCreateGroupError('Request timed out — check the board before retrying.');
+
+                        return;
+                    }
+
+                    setCreateGroupError(
+                        err instanceof Error ? err.message : 'Request failed. Try again.',
+                    );
+                })
+                .finally(() => {
+                    window.clearTimeout(timeoutId);
+                    setCreateGroupBusy(false);
+                });
+        } catch {
+            window.clearTimeout(timeoutId);
+            setCreateGroupError('Request failed. Try again.');
+            setCreateGroupBusy(false);
+        }
     };
 
     const patchState = (action: string) => {
@@ -583,8 +686,9 @@ export default function Show({
                 </div>
                 <button
                     type="button"
-                    onClick={() => setCreateGroupOpen((open) => !open)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-secondary/35 bg-secondary/10 py-3 font-mono text-xs font-bold tracking-wider text-secondary uppercase transition-colors hover:bg-secondary/20"
+                    onClick={() => (createGroupOpen ? closeCreateGroup() : openCreateGroup())}
+                    disabled={createGroupBusy}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-secondary/35 bg-secondary/10 py-3 font-mono text-xs font-bold tracking-wider text-secondary uppercase transition-colors hover:bg-secondary/20 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     <span className="material-symbols-outlined text-[16px]">
                         add_circle
@@ -1057,11 +1161,12 @@ export default function Show({
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                setCreateGroupOpen(
-                                                    (open) => !open,
-                                                )
+                                                (createGroupOpen
+                                                    ? closeCreateGroup()
+                                                    : openCreateGroup())
                                             }
-                                            className="rounded-lg border border-secondary/35 bg-secondary/10 px-3 py-1.5 font-mono text-xs font-bold text-secondary transition-colors hover:bg-secondary/20"
+                                            disabled={createGroupBusy}
+                                            className="rounded-lg border border-secondary/35 bg-secondary/10 px-3 py-1.5 font-mono text-xs font-bold text-secondary transition-colors hover:bg-secondary/20 disabled:cursor-not-allowed disabled:opacity-40"
                                         >
                                             + Create group
                                         </button>
@@ -1134,44 +1239,6 @@ export default function Show({
                                     </div>
                                 )}
                             </div>
-                            {createGroupOpen && (
-                                <GroupCreateDialog
-                                    title="Add an empty group"
-                                    description="Create a team before participants arrive, then place people into it from the roster."
-                                    name={createGroupName}
-                                    onNameChange={setCreateGroupName}
-                                    capacity={createGroupCapacity}
-                                    onCapacityChange={setCreateGroupCapacity}
-                                    capacityOptions={[
-                                        {
-                                            value: '',
-                                            label: 'Session default',
-                                            hint: `${minGroupCapacity}–${maxGroupCapacity} people`,
-                                        },
-                                        ...Array.from(
-                                            {
-                                                length:
-                                                    maxGroupCapacity -
-                                                    minGroupCapacity +
-                                                    1,
-                                            },
-                                            (_, i) => minGroupCapacity + i,
-                                        ).map((size) => ({
-                                            value: String(size),
-                                            label: `${size} ${size === 1 ? 'person' : 'people'}`,
-                                            hint: 'Fixed group capacity',
-                                        })),
-                                    ]}
-                                    onClose={() => {
-                                        setCreateGroupOpen(false);
-                                        setCreateGroupName('');
-                                        setCreateGroupCapacity('');
-                                    }}
-                                    onSubmit={createAdminGroup}
-                                    submitLabel="Add empty group"
-                                />
-                            )}
-
                             {groupView === 'cards' ? (
                                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                                     {data.groups.map((g) => {
@@ -2524,10 +2591,22 @@ export default function Show({
                                     {activity.slice(0, 15).map((e, i) => (
                                         <li
                                             key={i}
-                                            className="flex items-center justify-between border-b border-white/5 py-1"
+                                            className="flex items-center justify-between gap-3 border-b border-white/5 py-1"
                                         >
-                                            <span className="font-medium text-on-surface capitalize">
-                                                {e.type.replace(/_/g, ' ')}
+                                            <span className="min-w-0">
+                                                <span className="block font-medium text-on-surface capitalize">
+                                                    {e.type.replace(/_/g, ' ')}
+                                                </span>
+                                                {e.type === 'groups_created' &&
+                                                    Array.isArray(
+                                                        e.payload.names,
+                                                    ) &&
+                                                    e.payload.names.length >
+                                                        0 && (
+                                                        <span className="block truncate font-mono text-[10px] text-on-surface-variant/70">
+                                                            {e.payload.names.join(', ')}
+                                                        </span>
+                                                    )}
                                             </span>
                                             <span className="font-mono text-[10px] text-on-surface-variant/60">
                                                 {new Date(
@@ -2543,6 +2622,45 @@ export default function Show({
                 </div>
             </main>
 
+            {createGroupOpen && (
+                <GroupCreateDialog
+                    title="Add an empty group"
+                    description="Create a team before participants arrive, then place people into it from the roster."
+                    name={createGroupName}
+                    onNameChange={setCreateGroupName}
+                    capacity={createGroupCapacity}
+                    onCapacityChange={setCreateGroupCapacity}
+                    capacityOptions={[
+                        {
+                            value: '',
+                            label: 'Session default',
+                            hint: `${minGroupCapacity}–${maxGroupCapacity} people`,
+                        },
+                        ...Array.from(
+                            {
+                                length:
+                                    maxGroupCapacity -
+                                    minGroupCapacity +
+                                    1,
+                            },
+                            (_, i) => minGroupCapacity + i,
+                        ).map((size) => ({
+                            value: String(size),
+                            label: `${size} ${size === 1 ? 'person' : 'people'}`,
+                            hint: 'Fixed group capacity',
+                        })),
+                    ]}
+                    count={createGroupCount}
+                    onCountChange={setCreateGroupCount}
+                    randomNames={createGroupRandom}
+                    onRandomNamesChange={setCreateGroupRandom}
+                    busy={createGroupBusy}
+                    error={createGroupError}
+                    onClose={closeCreateGroup}
+                    onSubmit={createAdminGroup}
+                    submitLabel="Add empty group"
+                />
+            )}
             {memberDialog && (
                 <MemberActionDialog
                     action={memberDialog.action}

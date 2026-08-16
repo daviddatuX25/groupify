@@ -49,6 +49,58 @@ class AdminActionsController
         return response()->json(['ok' => true, 'group_id' => $group->id, 'name' => $group->name]);
     }
 
+    /**
+     * Create many empty groups atomically (bulk). Names come from
+     * GroupNamer::batch(); every committed group broadcasts GroupCreated and
+     * the whole request records one aggregate activity event.
+     */
+    public function createGroups(Request $request, Session $session, EventRecorder $recorder): JsonResponse
+    {
+        $this->authorizeAdmin($session, $request);
+
+        $rules = $session->config->rules();
+        $data = $request->validate([
+            // Manual names belong on the single-create endpoint; silently
+            // auto-naming a bulk group would diverge from that contract.
+            'name' => ['prohibited'],
+            'count' => ['required', 'integer', 'min:1', 'max:200'],
+            'capacity' => ['sometimes', 'integer', 'min:'.$rules['min_members'], 'max:'.$rules['max_members']],
+            'random_names' => ['sometimes', 'boolean'],
+        ]);
+
+        $count = (int) $data['count'];
+        $names = GroupNamer::batch($session, $count, (bool) ($data['random_names'] ?? false));
+
+        $groups = DB::transaction(function () use ($session, $names, $data): array {
+            return array_map(
+                fn (string $name): Group => $session->groups()->create([
+                    'name' => $name,
+                    'capacity' => $data['capacity'] ?? null,
+                    'field_values' => [],
+                ]),
+                $names,
+            );
+        });
+
+        foreach ($groups as $group) {
+            broadcast(new GroupCreated($session, $group))->toOthers();
+        }
+
+        $recorder->record($session, 'groups_created', [
+            'count' => count($groups),
+            'group_ids' => array_map(fn (Group $group): int => $group->id, $groups),
+            'names' => array_map(fn (Group $group): string => $group->name, $groups),
+            'by' => 'admin',
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'count' => count($groups),
+            'group_ids' => array_map(fn (Group $group): int => $group->id, $groups),
+            'names' => array_map(fn (Group $group): string => $group->name, $groups),
+        ]);
+    }
+
     /** Force-move a member to another group or back to the pool (kick). */
     public function move(Request $request, Session $session, Participant $participant, EventRecorder $recorder): JsonResponse
     {
